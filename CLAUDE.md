@@ -7,7 +7,6 @@ This is the platform repo for **project-solomon**: a self-hosted 3-node Kubernet
 - `infrastructure/` — All cluster manifests, synced by ArgoCD
 - `argocd-apps/` — ArgoCD Application CRs (app-of-apps pattern)
 - `scripts/` — Bootstrap scripts and MCP proxy bridges
-- `_template/` — Cookiecutter template for new services, agents, and apps
 - `.claude/` — Solomon skill files
 
 ## Quick start
@@ -29,7 +28,6 @@ Session brief format:
 
 ```
 SOLOMON // SESSION START — {date}
-MODE: OPS | BUILD | DESIGN  (set when first task is clear)
 
 Cluster Health
   Nodes: X/3 ready
@@ -44,32 +42,15 @@ Awaiting instructions.
 
 ---
 
-## Operating modes
-
-### OPS — Investigation and remediation
-- Diagnose cluster issues using MCP tools
-- Remediate safely; design Work Orders for anything destructive
-- Do not modify application code or manifests directly unless it is a hotfix
-
-### BUILD — Cluster and infrastructure changes
-- All changes via git → ArgoCD (commit to `main`, ArgoCD syncs)
-- Only use `kubectl apply` for emergency hotfixes — document why
-- **Always start BUILD sessions with `claude --model opus`**
-
-### DESIGN — Architecture and strategy
-- No cluster changes
-- Plan new services, infrastructure, migrations, and cookiecutter usage
-
----
-
 ## Key rules
 
 - **Git is the source of truth** — never make persistent cluster changes outside of git
 - **ArgoCD syncs `main`** — commit, push, ArgoCD picks it up
+- **Use `claude --model opus`** for any session making cluster or infrastructure changes
 - **Never schedule Ollama/LLM inference on orin-nano nodes** — 7 GB RAM, insufficient
 - **Never modify** kube-system, kube-public, kube-node-lease namespaces
 - **Never store secrets in plaintext** — always Sealed Secrets (`kubeseal`)
-- **Every new service** must be provisioned via the cookiecutter workflow (see `_template/`)
+- **Every new service** must be provisioned via the `solomon-app-template` GitHub template repo
 - **After any infra change** — check `argocd-apps/` for stale or missing Application CRs
 
 ---
@@ -140,15 +121,18 @@ MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-se
 
 ---
 
-## Cookiecutter workflow
+## New service workflow
 
-Every new service, agent, or app starts from `_template/`. See `_template/README.md` for full usage.
+Every new service, agent, or app starts from the `solomon-app-template` GitHub template repository.
 
-**Provision a new app (one-time):**
 ```bash
-# Trigger the provision workflow manually in GitHub Actions
-# OR let it auto-run when app.yaml is first committed to main
+# Create a new repo from the template
+gh repo create my-agent --template stephenj-code/solomon-app-template --private
 ```
+
+Edit `app.yaml` to describe what the app needs, then commit to `main`. The `provision.yaml` workflow runs automatically on first push and bootstraps all external dependencies.
+
+**Provision a new app (one-time, driven by `app.yaml`):**
 
 **What provisioning creates automatically** (driven by `app.yaml`):
 - Cloudflare CNAME (`<subdomain>.project-solomon.ai` → tunnel)
@@ -203,11 +187,16 @@ The Sealed Secrets controller lives in `infrastructure/sealed-secrets/`. Its pub
 ```
 Push to main (app repo)
   → GitHub Actions: build Docker image on self-hosted ARM64 runner
-  → Push to GHCR (ghcr.io/stephenj-code/<service>:<sha>)
-  → Patch k8s/deployment.yaml with new image tag
+  → Push to GHCR:
+      ghcr.io/stephenj-code/<service>:<7-char-sha>   ← immutable, used in deployment.yaml
+      ghcr.io/stephenj-code/<service>:latest          ← convenience alias
+  → On git tag (release): also push ghcr.io/stephenj-code/<service>:v1.2.3
+  → Patch k8s/deployment.yaml with SHA tag
   → Commit + push to main
   → ArgoCD detects change → syncs to cluster
 ```
+
+ArgoCD always tracks the SHA tag in `deployment.yaml` — immutable and traceable to exact code.
 
 Self-hosted runners: ARC on agx-orin-prod-1, ARM64, ephemeral pods, DinD sidecar, 100 GB Docker layer cache PVC on 1 TB SSD.
 

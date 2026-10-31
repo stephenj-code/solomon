@@ -24,7 +24,7 @@ All nodes: NVIDIA Jetson ARM64. Ollama and ARC runners pin to agx-orin-prod-1 (6
 
 | Component | Purpose |
 |-----------|---------|
-| Cilium | CNI — replaces Flannel; Istio-compatible (`kubeProxyReplacement=false`) |
+| Cilium | CNI — Istio-compatible (`kubeProxyReplacement=false`) |
 | NVIDIA operator | GPU runtime class for Jetson nodes |
 | local-path provisioner | Dynamic PVCs on 1 TB SSD (agx-orin-prod-1) |
 | cert-manager | Wildcard TLS — `*.project-solomon.ai` via Let's Encrypt DNS-01/Cloudflare |
@@ -35,7 +35,7 @@ All nodes: NVIDIA Jetson ARM64. Ollama and ARC runners pin to agx-orin-prod-1 (6
 | Component | Purpose |
 |-----------|---------|
 | Istio ambient mode | Service mesh — ztunnel DaemonSet (~50 MB/node), no per-pod sidecars |
-| Istio IngressGateway | Cluster ingress — replaces Traefik; hostPort 443 (LAN) + ClusterIP 80 (Cloudflare) |
+| Istio IngressGateway | Cluster ingress — hostPort 443 (LAN) + ClusterIP 80 (Cloudflare) |
 | Kubernetes Gateway API | HTTPRoute, Gateway, GatewayClass — standard over Istio VirtualService |
 | Cloudflare Tunnel | External access → Istio IngressGateway |
 | dnsmasq | Split DNS on agx-orin-prod-1 — LAN clients resolve `*.project-solomon.ai` → 192.168.1.49 directly |
@@ -70,11 +70,13 @@ Every application gets a Keycloak **resource server** client (audience validatio
 
 | Component | Purpose |
 |-----------|---------|
-| GitHub Actions | Build image → push GHCR → update image tag in git |
+| GitHub Actions | Build image → push GHCR → patch image tag in git → ArgoCD syncs |
 | GHCR | Container registry — free, automatic `GITHUB_TOKEN` auth |
 | ARC | Actions Runner Controller — self-hosted ARM64 ephemeral runners, plain YAML manifests |
 | Docker layer cache | 100 GB PVC on 1 TB SSD — cold build 4–6 min → warm 15–30 s |
 | ArgoCD | GitOps — watches `k8s/` in each app repo, syncs to cluster |
+
+**Image tagging:** every push to `main` produces `:<sha>` (immutable, used in `deployment.yaml`) and `:latest`. Release tags additionally produce `:v1.2.3`. ArgoCD always tracks the SHA tag — deployment history is fully traceable.
 
 ### MCP / Tools
 
@@ -189,14 +191,17 @@ Developer pushes to main (app repo)
   │
   ├─ build.yaml (GitHub Actions on self-hosted ARM64 runner)
   │    build Docker image (with layer cache from 1TB SSD PVC)
-  │    push to GHCR (ghcr.io/stephenj-code/<service>:<sha>)
-  │    patch k8s/deployment.yaml with new image tag
+  │    push to GHCR:
+  │      ghcr.io/stephenj-code/<service>:<7-char-sha>   ← immutable
+  │      ghcr.io/stephenj-code/<service>:latest
+  │    patch k8s/deployment.yaml with SHA tag
   │    commit + push to main
   │
   └─ ArgoCD detects k8s/ change
-       sync to cluster
-       rolling update → new pods running
+       sync to cluster → rolling update
 ```
+
+On git release tag: additionally pushes `ghcr.io/stephenj-code/<service>:v1.2.3`.
 
 Provisioning (first deploy only) runs separately via `provision.yaml` — calls Cloudflare API, Keycloak admin API, LiteLLM admin API. No cluster credentials in GitHub; all changes land via git commits that ArgoCD applies.
 
@@ -208,9 +213,13 @@ Provisioning (first deploy only) runs separately via `provision.yaml` — calls 
 
 ---
 
-## Cookiecutter: building a new service
+## Building a new service
 
-Every service, agent, and app starts from `_template/`. It provides a consistent structure, CI/CD workflows, and provisioning scripts.
+Every service, agent, and app starts from the **`solomon-app-template`** GitHub template repository. It provides a consistent structure, CI/CD workflows, and provisioning scripts.
+
+```bash
+gh repo create my-agent --template stephenj-code/solomon-app-template --private
+```
 
 ### App types
 
@@ -370,13 +379,6 @@ solomon/
 │   ├── ci-cd.yaml
 │   └── mcp-servers.yaml
 │   # per-app Application CRs added here by provisioning workflow
-│
-├── _template/                    # Cookiecutter base for new services/agents/apps
-│   ├── README.md
-│   ├── app.yaml
-│   ├── app/
-│   ├── k8s/
-│   └── .github/workflows/
 │
 └── scripts/
     ├── bootstrap.sh              # Day-0: install ArgoCD + apply root app
