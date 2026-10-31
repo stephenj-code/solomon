@@ -210,3 +210,85 @@ Push to main (app repo)
 ```
 
 Self-hosted runners: ARC on agx-orin-prod-1, ARM64, ephemeral pods, DinD sidecar, 100 GB Docker layer cache PVC on 1 TB SSD.
+
+---
+
+## Commit conventions
+
+All commits in this repo and every app repo follow **Conventional Commits**:
+
+```
+<type>: <short description>
+
+# Examples
+feat: add cloudnativepg operator
+fix: correct istio httproute for oauth2-proxy callback
+chore: bump litellm to 1.52.0
+refactor: consolidate mcp-server deployments into single namespace
+docs: update bootstrap sequence in README
+ci: add release-please workflow
+```
+
+**Types:**
+
+| Type | When to use |
+|------|------------|
+| `feat` | New capability — new infra component, new API endpoint, new agent feature |
+| `fix` | Corrects broken behaviour |
+| `refactor` | Restructures without changing behaviour |
+| `chore` | Maintenance — version bumps, cleanup, dependency updates |
+| `docs` | Documentation only |
+| `ci` | CI/CD workflow changes |
+| `test` | Test additions or fixes |
+
+**Breaking changes:** append `!` to the type or add a `BREAKING CHANGE:` footer:
+
+```
+feat!: replace traefik with istio ingressgateway
+
+BREAKING CHANGE: all HTTPRoute resources must be updated to Gateway API spec
+```
+
+Solomon writes commits in this format by default. Never write vague messages like `update config` or `fix stuff`.
+
+---
+
+## Branching strategy
+
+### Platform repo (this repo)
+
+```
+main        ArgoCD watches this. Stable, always deployable. Direct commits for small safe changes.
+v0.1        Current: initial cluster build. Merge to main when cluster is bootstrapped and healthy.
+feat/<name> Short-lived. Big or risky infra changes (CNI upgrade, new operator, Istio upgrade).
+fix/<name>  Short-lived. Hotfixes.
+```
+
+**When to use a feature branch:** anything that could destabilize the cluster if it goes wrong. Small config changes, adding namespaces, bumping image tags → direct to `main`.
+
+**Tagging milestones manually:**
+
+```bash
+git tag v0.1    # initial cluster healthy
+git tag v0.2    # first app deployed end-to-end
+git push origin --tags
+```
+
+**Generating a changelog between tags:**
+
+```bash
+git-cliff v0.1..v0.2 --output CHANGELOG.md
+git add CHANGELOG.md && git commit -m "docs: update changelog for v0.2"
+```
+
+### App repos (per service/agent/api)
+
+```
+main        ArgoCD watches this. Push to main = deploy to cluster.
+feat/<name> Non-trivial features, dependency changes, agent graph changes.
+fix/<name>  Bug fixes (small ones can go direct to main).
+```
+
+**Releases via release-please:** a GitHub Action watches `main` for conventional commits and opens a Release PR automatically. Merge it when ready to cut a release. On merge: git tag + GitHub Release + CHANGELOG.md generated automatically.
+
+ArgoCD for most app repos tracks `main` (continuous deploy). For stable/production-critical apps, point ArgoCD at the latest release tag instead.

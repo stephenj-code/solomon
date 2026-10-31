@@ -1,0 +1,60 @@
+# git-cliff configuration — project-solomon
+# Generates CHANGELOG.md from conventional commits
+# Usage: git-cliff v0.1..v0.2 --output CHANGELOG.md
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented here.
+Generated from [Conventional Commits](https://www.conventionalcommits.org).\n
+"""
+body = """
+{% if version %}\
+## {{ version }} — {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}\
+### {{ group }}
+{% for commit in commits %}\
+- {% if commit.breaking %}**[BREAKING]** {% endif %}{{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](../../commit/{{ commit.id }}))
+{% endfor %}
+{% endfor %}\n
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+tag_pattern = "v[0-9].*"
+ignore_tags = ""
+topo_order = false
+sort_commits = "oldest"
+
+commit_parsers = [
+  { message = "^feat!", group = "Breaking Changes" },
+  { message = "^fix!", group = "Breaking Changes" },
+  { body = "BREAKING CHANGE", group = "Breaking Changes" },
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^ci", group = "CI/CD" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^chore\\(deps\\)", group = "Dependency Updates" },
+  { message = "^chore", group = "Maintenance" },
+  { message = "^perf", group = "Performance" },
+  # skip generic merge commits and co-authored-by commits
+  { message = "^Merge", skip = true },
+  { message = "Co-Authored-By", skip = true },
+]
+
+# Only include these groups in the output (others skipped)
+# Remove groups you don't want in the changelog
+commit_preprocessors = [
+  # strip trailing whitespace
+  { pattern = '\s+$', replace = "" },
+]

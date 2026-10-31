@@ -425,3 +425,94 @@ kubectl apply -f infrastructure/foundation/sealed-secrets/
 ```
 
 See `scripts/bootstrap.sh` for the full annotated sequence.
+
+---
+
+## Branching and releases
+
+### Commit conventions
+
+All commits — in this repo and every app repo — follow **Conventional Commits**:
+
+```
+<type>: <short description>
+
+feat: add cloudnativepg operator
+fix: correct istio httproute for oauth2-proxy callback
+chore: bump litellm to 1.52.0
+refactor: consolidate mcp-server deployments
+docs: update bootstrap sequence
+ci: add release-please workflow
+feat!: replace traefik with istio ingressgateway   ← breaking change
+```
+
+| Type | When |
+|------|------|
+| `feat` | New capability |
+| `fix` | Corrects broken behaviour |
+| `refactor` | Restructures without changing behaviour |
+| `chore` | Maintenance, version bumps, cleanup |
+| `docs` | Documentation only |
+| `ci` | CI/CD workflow changes |
+
+This discipline keeps `git log` readable and enables automated changelog generation.
+
+### Platform repo branching
+
+```
+main          ArgoCD target. Stable, always deployable.
+v0.1          Current working branch — initial cluster build. Merges to main when healthy.
+feat/<name>   Short-lived — risky infra changes (CNI upgrade, new operator, Istio upgrade).
+fix/<name>    Short-lived — hotfixes.
+```
+
+Small safe changes (config tweaks, namespace additions, image bumps) go directly to `main`.
+Anything that could destabilize the cluster goes on a feature branch — review the diff before merging.
+
+**Milestone tagging:**
+```bash
+git tag v0.1    # initial cluster bootstrapped and healthy
+git tag v0.2    # first app deployed end-to-end
+git push origin --tags
+```
+
+**Changelog generation** (git-cliff reads conventional commits):
+```bash
+git-cliff v0.1..v0.2 --output CHANGELOG.md
+```
+
+### App repo branching
+
+```
+main          ArgoCD target. Push to main = deploy to cluster.
+feat/<name>   Non-trivial features, dependency changes, graph changes.
+fix/<name>    Bug fixes (small ones can go direct to main).
+```
+
+**Automated releases via release-please:**
+
+A GitHub Actions workflow watches `main` for conventional commits and automatically opens a Release PR with version bump + CHANGELOG.md. Merge when ready to cut a release → creates git tag + GitHub Release.
+
+```yaml
+# .github/workflows/release.yaml  (included in _template/)
+- uses: googleapis/release-please-action@v4
+  with:
+    release-type: python
+```
+
+ArgoCD targets `main` for continuous deploy on most app repos. Point at the latest release tag for anything that needs explicit promotion before deploying.
+
+### Changelog
+
+`cliff.toml` at the repo root configures git-cliff for platform changelog generation. Run:
+
+```bash
+# Since last tag
+git-cliff --output CHANGELOG.md
+
+# Between specific tags
+git-cliff v0.1..v0.2 --output CHANGELOG.md
+
+# Preview without writing
+git-cliff --unreleased
+```
