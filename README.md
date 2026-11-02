@@ -14,7 +14,7 @@ Managed by **Solomon** — a Claude Code skill that knows the cluster, builds se
 | orin-nano-prod-1 | worker | 7 GB | 192.168.1.175 |
 | orin-nano-dev-1 | worker | 7 GB | 192.168.1.139 |
 
-All nodes: NVIDIA Jetson ARM64. Ollama and ARC runners pin to agx-orin-prod-1 (61 GB RAM, 1 TB SSD, GPU).
+All nodes: NVIDIA Jetson ARM64. LLM inference and ARC runners pin to agx-orin-prod-1 (61 GB RAM, 1 TB SSD, GPU).
 
 ---
 
@@ -63,8 +63,21 @@ Every application gets a Keycloak **resource server** client (audience validatio
 
 | Component | Purpose |
 |-----------|---------|
-| Ollama | Local LLM inference on agx-orin-prod-1 (deepseek-r1:14b, qwen2.5:14b) |
+| llama-server | Local LLM inference via NVIDIA Jetson AI Lab container — only NVIDIA-officially-supported models |
 | LiteLLM proxy | Unified LLM gateway — per-service virtual keys, budgets, cost tracking, MCP aggregation |
+
+**Current model:** Meta Muse Glimmer 30B (Q4_K_M, ~17 GB) — purpose-built for agentic workloads; native tool calling, multi-step reasoning, multimodal. Runs at ~25 tok/s on AGX Orin with DFlash speculative decoding. Apache 2.0.
+
+**Model policy:** only models with an official NVIDIA Jetson AI Lab container are deployed. No community GGUFs, no Ollama. When a new model is needed, check [jetson-ai-lab.com](https://www.jetson-ai-lab.com) first. New models are added as a second `llama-server` Deployment — LiteLLM aliases route to the right one.
+
+**LiteLLM model aliases** (agents code against these, never raw model names):
+
+| Alias | Backing model | Use for |
+|-------|--------------|---------|
+| `smart` | Muse Glimmer 30B (local) | Agent reasoning, planning, tool calls, code gen |
+| `external` | Claude Sonnet (Anthropic) | Fallback when local is insufficient or unavailable |
+
+Add a `fast` alias when a second NVIDIA-supported small model is deployed.
 
 ### CI/CD
 
@@ -341,7 +354,7 @@ solomon/
 │   │   ├── cloudnativepg/        # operator + shared cluster
 │   │   └── databases/            # per-app Database CRDs (added by provisioning)
 │   ├── ai/
-│   │   ├── ollama/
+│   │   ├── llama-server/         # NVIDIA Jetson AI Lab inference container
 │   │   └── litellm/
 │   ├── backup/
 │   │   ├── minio/

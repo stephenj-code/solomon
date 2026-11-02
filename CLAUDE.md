@@ -47,7 +47,7 @@ Awaiting instructions.
 - **Git is the source of truth** — never make persistent cluster changes outside of git
 - **ArgoCD syncs `main`** — commit, push, ArgoCD picks it up
 - **Use `claude --model opus`** for any session making cluster or infrastructure changes
-- **Never schedule Ollama/LLM inference on orin-nano nodes** — 7 GB RAM, insufficient
+- **Never schedule LLM inference on orin-nano nodes** — 7 GB RAM, insufficient; llama-server pins to agx-orin-prod-1
 - **Never modify** kube-system, kube-public, kube-node-lease namespaces
 - **Never store secrets in plaintext** — always Sealed Secrets (`kubeseal`)
 - **Every new service** must be provisioned via the `solomon-app-template` GitHub template repo
@@ -78,7 +78,7 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | orin-nano-prod-1 | worker | 7 GB | 192.168.1.175 |
 | orin-nano-dev-1 | worker | 7 GB | 192.168.1.139 |
 
-**agx-orin-prod-1** hosts: Ollama (local LLMs), ARC self-hosted runners, Docker layer cache (1 TB SSD), dnsmasq (LAN DNS), control-plane components.
+**agx-orin-prod-1** hosts: llama-server (LLM inference, NVIDIA Jetson AI Lab container), ARC self-hosted runners, Docker layer cache (1 TB SSD), dnsmasq (LAN DNS), control-plane components.
 
 **orin-nano nodes** — workers only. Never schedule LLM inference here.
 
@@ -92,7 +92,7 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | `arc-runners` | Ephemeral GitHub Actions runner pods |
 | `argocd` | ArgoCD |
 | `auth` | Keycloak, oauth2-proxy |
-| `ai` | Ollama, LiteLLM proxy |
+| `ai` | llama-server (NVIDIA Jetson AI Lab), LiteLLM proxy |
 | `backup` | Velero, MinIO |
 | `database` | CloudNativePG operator + shared postgres cluster |
 | `mcp-servers` | Cluster-level MCP servers (kubernetes, prometheus, database) |
