@@ -8,37 +8,11 @@ This is the platform repo for **project-solomon**: a self-hosted 3-node Kubernet
 - `argocd-apps/` — ArgoCD Application CRs (app-of-apps pattern)
 - `scripts/` — Bootstrap scripts and MCP proxy bridges
 - `.claude/` — Solomon skill files
+- `MIGRATION.md` — Cluster build/migration task checklist
 
 ## Quick start
 
 Run `/solomon` or say **"become solomon"** to initialize a session.
-
-## When "become solomon" is said
-
-Execute in order:
-
-1. **Read this file** — internalize topology, rules, tool inventory
-2. **Check node health**: `mcp__solomon-kubernetes__list_nodes` — surface any NotReady nodes
-3. **Check degraded workloads**: `mcp__solomon-kubernetes__list_deployments` across all namespaces — flag anything not fully available
-4. **Check active alerts**: `mcp__solomon-prometheus__prometheus_get_alerts` — surface firing alerts
-5. **Output session brief** — health score, any issues, mode, available tools
-6. **Await instructions**
-
-Session brief format:
-
-```
-SOLOMON // SESSION START — {date}
-
-Cluster Health
-  Nodes: X/3 ready
-  Deployments: X degraded (list them)
-  Alerts: X firing (list them)
-
-Tool Inventory
-  kubernetes / prometheus / filesystem
-
-Awaiting instructions.
-```
 
 ---
 
@@ -51,9 +25,13 @@ Awaiting instructions.
 - **AI model policy** — only models listed on [jetson-ai-lab.com/models](https://www.jetson-ai-lab.com/models/) are deployed; check there first before adding any model
 - **HuggingFace token required** — llama-server and vllm pull models from HuggingFace on first start; token stored as SealedSecret in `ai` namespace
 - **Never modify** kube-system, kube-public, kube-node-lease namespaces
-- **Never store secrets in plaintext** — always Sealed Secrets (`kubeseal`)
+- **Never store secrets in plaintext** — always Sealed Secrets (`kubeseal`); exception: Frigate RTSP creds live in `/data/frigate/.env` (chmod 600) on the host
 - **Every new service** must be provisioned via the `solomon-app-template` GitHub template repo
 - **After any infra change** — check `argocd-apps/` for stale or missing Application CRs
+- **Agent co-location** — agents live in their tool's namespace (see namespace inventory); `agents` namespace is catch-all only
+- **All agents registered in LiteLLM agent registry** — provisioning workflow handles this automatically
+- **Never use Istio VirtualService** — always use Kubernetes Gateway API `HTTPRoute`
+- **Deny-by-default AuthorizationPolicy** is active on `ai`, `auth`, `mcp-servers` — explicit allow rules required for new in-cluster consumers
 
 ---
 
@@ -80,7 +58,7 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | orin-nano-prod-1 | worker | 7 GB | 192.168.1.175 |
 | orin-nano-dev-1 | worker | 7 GB | 192.168.1.139 |
 
-**agx-orin-prod-1** hosts: llama-server (Muse Glimmer 30B, llama.cpp), vllm (Nemotron3 Nano 30B-A3B), ARC self-hosted runners, Docker layer cache (1 TB SSD), dnsmasq (LAN DNS), control-plane components.
+**agx-orin-prod-1** hosts: llama-server (Muse Glimmer 30B, llama.cpp), vllm (Nemotron3 Nano 30B-A3B), ARC self-hosted runners, Docker layer cache (1 TB SSD), dnsmasq (LAN DNS), Frigate NVR (Docker, not k8s), control-plane components.
 
 **orin-nano nodes** — workers only. Never schedule LLM inference here.
 
@@ -94,18 +72,53 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | `arc-runners` | Ephemeral GitHub Actions runner pods |
 | `argocd` | ArgoCD |
 | `auth` | Keycloak, oauth2-proxy, **keycloak-agent** |
-| `ai` | llama-server (llama.cpp, Muse Glimmer 30B), vllm (Nemotron3 Nano 30B-A3B), LiteLLM proxy, **litellm-agent** |
+| `ai` | llama-server (Muse Glimmer 30B), vllm (Nemotron3 Nano), LiteLLM proxy, **litellm-agent** |
 | `backup` | Velero, MinIO, **backup-agent** |
 | `database` | CloudNativePG operator + shared postgres cluster, **database-agent** |
-| `mcp-servers` | Cluster-level MCP servers (kubernetes, prometheus, database) — Solomon tools only |
+| `mcp-servers` | solomon-kubernetes, solomon-prometheus, solomon-filesystem — Solomon tools only |
 | `mcp-external` | Third-party MCP servers (network-isolated) |
-| `nvr` | Frigate NVR, **frigate-agent** |
+| `nvr` | **frigate-agent** only — Frigate itself runs as Docker on agx-orin-prod-1 host |
 | `observability` | Prometheus, Grafana, Loki, Promtail, Kiali, Jaeger, **grafana-agent**, **loki-agent** |
+| `security` | Trivy Operator, **security-agent** |
 | `agents` | Cross-cutting agents with no natural home namespace |
 
-**Agent co-location rule:** agents live in their tool's namespace. The `agents` namespace is a catch-all only for agents that span multiple tools or have no natural home.
+**Frigate note:** Frigate NVR runs as a Docker container on agx-orin-prod-1 (`--network=host`, `--privileged`, nvidia runtime). It is intentionally NOT in Kubernetes — host networking + GPU passthrough + single-instance bring no benefit from k8s orchestration. Exposed to the cluster via Istio `ServiceEntry` → `HTTPRoute` → `frigate.project-solomon.ai`. The frigate-agent calls `http://192.168.1.49:5000` directly.
 
-Each application, agent, and UI gets its own namespace provisioned via the cookiecutter workflow.
+---
+
+## Ingress architecture
+
+```
+External user
+  DNS: <subdomain>.project-solomon.ai → Cloudflare
+  Cloudflare Tunnel → cloudflared pod → Istio IngressGateway (ClusterIP :80)
+
+LAN user (DNS set to 192.168.1.49)
+  DNS: <subdomain>.project-solomon.ai → dnsmasq → 192.168.1.49
+  Direct → Istio IngressGateway (hostPort :443, wildcard TLS via cert-manager)
+
+Istio IngressGateway
+  Istio JWT auth policy → validates Keycloak JWT on every request
+  HTTPRoute → service in target namespace
+  (UI apps: oauth2-proxy sits in front, handles browser SSO redirect)
+  (API apps: JWT passed directly, audience claim checked)
+```
+
+**Service types:** all internal services use ClusterIP. No NodePort. IngressGateway uses hostPort :443 (not NodePort — binds directly to node NIC via nodeSelector on agx-orin-prod-1).
+
+**External services (e.g. Frigate):** Istio `ServiceEntry` registers host endpoints into the mesh. `HTTPRoute` routes the subdomain to the ServiceEntry.
+
+---
+
+## Security posture
+
+**mTLS:** Istio ambient mode — ztunnel DaemonSet transparently encrypts all pod-to-pod traffic. Every pod has a SPIFFE identity. No sidecars required.
+
+**Deny-by-default:** `AuthorizationPolicy` (empty spec = deny-all) is applied to `ai`, `auth`, `mcp-servers`. Explicit allow rules use SPIFFE principals (`cluster.local/ns/<ns>/sa/<sa>`).
+
+**L4 NetworkPolicy:** Cilium NetworkPolicy enforced at kernel via eBPF (independent of mesh). Key rules: block pods from reaching kube-apiserver (except argocd, arc-runners, mcp-servers), block cross-namespace by default, block internet egress (except ai, arc-runners, argocd).
+
+**Vulnerability scanning:** Trivy Operator continuously scans all running pods → `VulnerabilityReport` CRDs → Prometheus metrics. Trivy also runs in CI (image scan + IaC scan). security-agent queries these CRDs and escalates CVEs.
 
 ---
 
@@ -122,7 +135,7 @@ Tools are available via MCP bridges configured in `.mcp.json`. Bridges proxy thr
 **solomon-filesystem/**
 `read_file`, `write_file`, `patch_file`, `list_dir`, `run_shell`, `node_exec` (targets: agx-orin-prod-1, orin-nano-prod-1, orin-nano-dev-1)
 
-MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-servers` namespace.
+MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-servers` namespace. These are Solomon's tools only. Individual agents use native LangGraph `@tool` functions against their primary service — not MCP.
 
 ---
 
@@ -131,42 +144,21 @@ MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-se
 Every new service, agent, or app starts from the `solomon-app-template` GitHub template repository.
 
 ```bash
-# Create a new repo from the template
 gh repo create my-agent --template stephenj-code/solomon-app-template --private
 ```
 
 Edit `app.yaml` to describe what the app needs, then commit to `main`. The `provision.yaml` workflow runs automatically on first push and bootstraps all external dependencies.
 
-**Provision a new app (one-time, driven by `app.yaml`):**
-
 **What provisioning creates automatically** (driven by `app.yaml`):
 - Cloudflare CNAME (`<subdomain>.project-solomon.ai` → tunnel)
 - LiteLLM virtual key (sealed → committed to `k8s/sealed-secrets/`)
+- LiteLLM agent registry entry (all apps registered as agents by default)
 - Keycloak resource server client (audience validation, all apps)
 - Keycloak browser client + oauth2-proxy config (UI apps only)
 - Keycloak service account client (M2M apps only)
 - CloudNativePG Database CRD committed to platform repo (if `needs.database: true`)
 - ArgoCD Application committed to `argocd-apps/` in this repo
 - Namespace, ServiceAccount, HTTPRoute, Istio JWT auth policy
-
----
-
-## Ingress architecture
-
-```
-External user
-  DNS: <subdomain>.project-solomon.ai → Cloudflare
-  Cloudflare Tunnel → Istio IngressGateway (ClusterIP :80)
-
-LAN user (DNS set to 192.168.1.49)
-  DNS: <subdomain>.project-solomon.ai → 192.168.1.49 (dnsmasq)
-  Direct → Istio IngressGateway (hostPort :443, wildcard TLS via cert-manager)
-
-Istio IngressGateway
-  HTTPRoute → service in target namespace
-  Istio JWT auth policy → validates Keycloak JWT on every request
-  (UI apps: oauth2-proxy sits in front, handles browser SSO redirect)
-```
 
 ---
 
@@ -183,7 +175,9 @@ kubectl create secret generic my-secret \
   > k8s/sealed-secrets/my-secret.yaml
 ```
 
-The Sealed Secrets controller lives in `infrastructure/sealed-secrets/`. Its public key is cached at `scripts/sealed-secrets.pem` for offline sealing.
+The Sealed Secrets controller lives in `infrastructure/foundation/sealed-secrets/`. Its public key is cached at `scripts/sealed-secrets.pem` for offline sealing.
+
+**Exception — Frigate RTSP credentials:** stored in `/data/frigate/.env` (chmod 600) on agx-orin-prod-1 host. Docker reads them at startup via `--env-file`. Never in a k8s Secret.
 
 ---
 
@@ -192,18 +186,18 @@ The Sealed Secrets controller lives in `infrastructure/sealed-secrets/`. Its pub
 ```
 Push to main (app repo)
   → GitHub Actions: build Docker image on self-hosted ARM64 runner
+  → Trivy image scan (fail on CRITICAL CVEs)
+  → Bandit / Semgrep SAST scan
   → Push to GHCR:
       ghcr.io/stephenj-code/<service>:<7-char-sha>   ← immutable, used in deployment.yaml
-      ghcr.io/stephenj-code/<service>:latest          ← convenience alias
+      ghcr.io/stephenj-code/<service>:latest
   → On git tag (release): also push ghcr.io/stephenj-code/<service>:v1.2.3
   → Patch k8s/deployment.yaml with SHA tag
   → Commit + push to main
   → ArgoCD detects change → syncs to cluster
 ```
 
-ArgoCD always tracks the SHA tag in `deployment.yaml` — immutable and traceable to exact code.
-
-Self-hosted runners: ARC on agx-orin-prod-1, ARM64, ephemeral pods, DinD sidecar, 100 GB Docker layer cache PVC on 1 TB SSD.
+ArgoCD always tracks the SHA tag in `deployment.yaml`. Self-hosted runners: ARC on agx-orin-prod-1, ARM64, ephemeral pods, DinD sidecar, 100 GB Docker layer cache PVC.
 
 ---
 
@@ -214,20 +208,17 @@ All commits in this repo and every app repo follow **Conventional Commits**:
 ```
 <type>: <short description>
 
-# Examples
 feat: add cloudnativepg operator
 fix: correct istio httproute for oauth2-proxy callback
 chore: bump litellm to 1.52.0
 refactor: consolidate mcp-server deployments into single namespace
 docs: update bootstrap sequence in README
-ci: add release-please workflow
+ci: add trivy image scanning to build workflow
 ```
-
-**Types:**
 
 | Type | When to use |
 |------|------------|
-| `feat` | New capability — new infra component, new API endpoint, new agent feature |
+| `feat` | New capability |
 | `fix` | Corrects broken behaviour |
 | `refactor` | Restructures without changing behaviour |
 | `chore` | Maintenance — version bumps, cleanup, dependency updates |
@@ -235,13 +226,7 @@ ci: add release-please workflow
 | `ci` | CI/CD workflow changes |
 | `test` | Test additions or fixes |
 
-**Breaking changes:** append `!` to the type or add a `BREAKING CHANGE:` footer:
-
-```
-feat!: replace traefik with istio ingressgateway
-
-BREAKING CHANGE: all HTTPRoute resources must be updated to Gateway API spec
-```
+**Breaking changes:** append `!` or add `BREAKING CHANGE:` footer.
 
 Solomon writes commits in this format by default. Never write vague messages like `update config` or `fix stuff`.
 
@@ -268,7 +253,7 @@ git tag v0.2    # first app deployed end-to-end
 git push origin --tags
 ```
 
-**Generating a changelog between tags:**
+**Generating a changelog:**
 
 ```bash
 git-cliff v0.1..v0.2 --output CHANGELOG.md
@@ -283,6 +268,4 @@ feat/<name> Non-trivial features, dependency changes, agent graph changes.
 fix/<name>  Bug fixes (small ones can go direct to main).
 ```
 
-**Releases via release-please:** a GitHub Action watches `main` for conventional commits and opens a Release PR automatically. Merge it when ready to cut a release. On merge: git tag + GitHub Release + CHANGELOG.md generated automatically.
-
-ArgoCD for most app repos tracks `main` (continuous deploy). For stable/production-critical apps, point ArgoCD at the latest release tag instead.
+**Releases via release-please:** a GitHub Action watches `main` for conventional commits and opens a Release PR automatically. Merge to cut a release → git tag + GitHub Release + CHANGELOG.md generated automatically.
