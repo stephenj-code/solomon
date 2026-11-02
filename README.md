@@ -113,11 +113,25 @@ No OpenRouter — LiteLLM is the gateway. Adding OpenRouter would just insert a 
 
 | Tier | Location | Purpose |
 |------|----------|---------|
-| Cluster tools | `infrastructure/mcp-servers/` | kubernetes, prometheus, database — shared by all agents |
-| Agent tools | App repo sidecar container | Agent-specific business logic tools |
-| Third-party tools | `mcp-external` namespace or remote endpoint | External APIs registered in LiteLLM |
+| Cluster tools | `mcp-servers` namespace | MCP servers for kubernetes, prometheus, filesystem — shared by Solomon and all agents |
+| Agent tools | `@tool` functions in agent code | Direct HTTP calls to the agent's own service (Grafana API, Frigate API, etc.) — no MCP wrapper needed |
+| Third-party tools | `mcp-external` namespace | External APIs in network-isolated pods — registered in LiteLLM |
 
-LiteLLM acts as the **MCP gateway** — all MCP servers register with it. Agents discover and call tools through a single endpoint. Tool calls are logged and tracked alongside LLM usage.
+**MCP is for Solomon and shared cluster infrastructure tools only.** Individual agents use native LangGraph `@tool` functions to call their primary service directly via in-cluster DNS + Istio mTLS. Wrapping a single-agent tool in MCP adds an unnecessary hop.
+
+**Agent co-location rule:** agents live in the same namespace as their primary tool. The `agents` namespace is a catch-all for agents that span multiple tools or have no natural home.
+
+| Namespace | Tool service | Agent |
+|-----------|-------------|-------|
+| `observability` | Prometheus, Grafana, Loki | grafana-agent, loki-agent |
+| `ai` | llama-server, vllm, LiteLLM | litellm-agent |
+| `auth` | Keycloak | keycloak-agent |
+| `database` | CloudNativePG | database-agent |
+| `backup` | Velero, MinIO | backup-agent |
+| `nvr` | Frigate (Docker on host, exposed via ServiceEntry) | frigate-agent |
+| `security` | Trivy Operator | security-agent |
+
+All agents register in the **LiteLLM agent registry** — Solomon discovers and invokes them by name without hardcoding URLs. Every provisioned app is registered as an agent entry by default.
 
 ### Observability
 
@@ -129,6 +143,27 @@ LiteLLM acts as the **MCP gateway** — all MCP servers register with it. Agents
 | Promtail | DaemonSet — ships pod logs from all nodes to Loki |
 | Kiali | Istio service mesh topology and traffic visualization |
 | Jaeger | Distributed tracing |
+
+### Security
+
+| Component | Where | Purpose |
+|-----------|-------|---------|
+| Trivy Operator | `security` namespace | Continuously scans all running pods — creates `VulnerabilityReport`, `ConfigAuditReport`, `ExposedSecretReport` CRDs per workload. Exports Prometheus metrics. |
+| Trivy CLI (CI) | GitHub Actions (ARC runner) | Image scan after build, before push to GHCR — fails build on CRITICAL CVEs. Also scans `infrastructure/` YAML for k8s misconfigs. |
+| Bandit | GitHub Actions | Python SAST — runs on every PR across all app repos. |
+| Semgrep | GitHub Actions | Pattern-based SAST — OWASP Top 10, injection, custom rules. |
+| Cilium NetworkPolicy | CNI layer | L3/L4 kernel-level enforcement — blocks API server access, cross-namespace traffic, internet egress. Defense-in-depth beneath Istio. |
+| Istio AuthorizationPolicy | `ai`, `auth`, `mcp-servers` | Deny-by-default per namespace with explicit allow rules using SPIFFE identity. |
+| Pod Security Standards | Admission | `baseline` cluster-wide, `restricted` on `ai` + `auth`. |
+| Renovate Bot | GitHub | Weekly dependency update PRs — CI Trivy scan validates before merge. |
+
+**Vulnerability pipeline:**
+```
+commit → pre-commit (git-secrets, bandit)
+  → PR → CI: build image → Trivy image scan (fail CRITICAL) → Bandit/Semgrep → Trivy IaC scan → tests
+  → merge → ArgoCD deploy
+  → Trivy Operator: continuous rescan → Prometheus alert on new CVE → Renovate PR → redeploy
+```
 
 ### Backup
 
@@ -143,24 +178,57 @@ LiteLLM acts as the **MCP gateway** — all MCP servers register with it. Agents
 
 ### Networking and ingress
 
-Traffic enters the cluster from two paths:
+**Kubernetes Service types used:**
+- **ClusterIP** — all internal services. Nothing is exposed directly from the cluster.
+- **hostPort :443** on the IngressGateway pod (pinned to agx-orin-prod-1 via nodeSelector) — binds directly to the node's NIC. LAN traffic hits `192.168.1.49:443`.
+- **NodePort** — not used. High random ports and opens on all nodes — not suitable for a clean entry point.
+
+**Six traffic patterns:**
 
 ```
-External user
-  browser/client → Cloudflare DNS (*.project-solomon.ai)
-  → Cloudflare Tunnel → Istio IngressGateway (ClusterIP :80)
-  → HTTPRoute → target service
+1. External browser (internet)
+   → Cloudflare DNS → Cloudflare Tunnel
+   → cloudflared pod (ClusterIP :80, no TLS — tunnel handles it)
+   → Istio IngressGateway → Istio JWT auth policy
+   → HTTPRoute → oauth2-proxy (UI) or direct (API)
+   → ClusterIP Service → Pod
 
-LAN user (device DNS set to 192.168.1.49)
-  browser/client → dnsmasq on agx-orin-prod-1
-  → resolves *.project-solomon.ai → 192.168.1.49
-  → Istio IngressGateway (hostPort :443, wildcard TLS)
-  → HTTPRoute → target service
+2. LAN browser
+   → dnsmasq: *.project-solomon.ai → 192.168.1.49
+   → Istio IngressGateway (hostPort :443, TLS terminated by cert-manager)
+   → Istio JWT auth policy
+   → HTTPRoute → oauth2-proxy (UI) or direct (API)
+   → ClusterIP Service → Pod
+
+3. API / M2M client (JWT already held)
+   → Either path above to IngressGateway
+   → Istio JWT auth policy validates token + audience claim
+   → HTTPRoute → ClusterIP Service → Pod (no oauth2-proxy)
+
+4. In-cluster pod-to-pod
+   → ClusterIP Service (DNS: service.namespace.svc.cluster.local)
+   → ztunnel intercepts transparently (no sidecar)
+   → mTLS encrypted tunnel between nodes
+   → destination Pod
+
+5. Cluster → external service (e.g. Frigate Docker container)
+   → ServiceEntry registers 192.168.1.49:5000 into mesh
+   → HTTPRoute routes frigate.project-solomon.ai to that entry
+   → Plain HTTP on LAN (traffic leaves mesh — no mTLS)
+
+6. Solomon MCP tools
+   → scripts/mcp-proxy.py
+   → kubectl exec / port-forward
+   → MCP server pod in mcp-servers namespace
 ```
 
-LAN path bypasses Cloudflare entirely — ~65 ms TTFB vs ~375 ms via tunnel.
+LAN path (pattern 2) bypasses Cloudflare entirely — ~65 ms TTFB vs ~375 ms via tunnel.
 
-Istio IngressGateway is the single entry point. Every inbound request passes through Istio JWT auth policy before reaching the service.
+**L4 NetworkPolicy (Cilium):** sits beneath Istio as a defense-in-depth layer. Enforced at the kernel via eBPF — independent of the mesh. Key policies: block pods from reaching kube-apiserver (except ArgoCD, ARC, MCP servers), block cross-namespace traffic by default, block internet egress (except `ai`, `arc-runners`, `argocd`).
+
+**mTLS:** Istio ambient mode — ztunnel runs as a DaemonSet on every node and transparently encrypts all pod-to-pod traffic. Every pod gets a SPIFFE identity (`spiffe://cluster.local/ns/<ns>/sa/<sa>`). No sidecars, no app changes required. mTLS applies within the mesh only; traffic to external services (Frigate) is plain HTTP on the LAN.
+
+**Deny-by-default:** Istio JWT AuthPolicy at the IngressGateway rejects requests without a valid Keycloak JWT. In-cluster, `AuthorizationPolicy` with an empty spec (deny-all) is applied to `ai`, `auth`, and `mcp-servers` namespaces, with explicit allow rules per service using SPIFFE identity.
 
 ### Auth flows
 
@@ -235,6 +303,15 @@ Developer pushes to main (app repo)
 On git release tag: additionally pushes `ghcr.io/stephenj-code/<service>:v1.2.3`.
 
 Provisioning (first deploy only) runs separately via `provision.yaml` — calls Cloudflare API, Keycloak admin API, LiteLLM admin API. No cluster credentials in GitHub; all changes land via git commits that ArgoCD applies.
+
+### NVR (Frigate)
+
+Frigate runs as a **Docker container directly on agx-orin-prod-1** — not in Kubernetes. This is intentional:
+- Requires `--network=host` (RTSP cameras on LAN 192.168.1.x) and `--privileged` + NVIDIA runtime for TensorRT — none of these benefit from k8s orchestration
+- `--restart=unless-stopped` provides the same reliability as a k8s liveness probe for a single-instance app
+- Two Amcrest cameras (`front-west`, `front-east`) via RTSP, YOLOv8m TensorRT detector, person re-ID for named individuals
+
+**Exposed to the cluster** via an Istio `ServiceEntry` pointing at `192.168.1.49:5000` + an HTTPRoute for `frigate.project-solomon.ai`. The `frigate-agent` in the `nvr` namespace calls the Frigate REST API directly at `http://192.168.1.49:5000`. Live camera view uses MSE streaming (HTTP-compatible with Cloudflare Tunnel) — WebRTC available on LAN only.
 
 ### Agent communication protocols
 
@@ -396,7 +473,10 @@ solomon/
 │   │   ├── kubernetes/
 │   │   ├── prometheus/
 │   │   └── database/
+│   ├── nvr/
+│   │   └── frigate-serviceentry.yaml # Frigate runs as Docker on host — ServiceEntry + HTTPRoute exposes it
 │   └── security/
+│       └── trivy-operator/           # Trivy Operator — VulnerabilityReport/ConfigAuditReport CRDs
 │
 ├── argocd-apps/                  # App-of-apps: one Application CR per component
 │   ├── _root.yaml                # root app — ArgoCD watches this directory
@@ -409,7 +489,9 @@ solomon/
 │   ├── observability.yaml
 │   ├── gitops.yaml
 │   ├── ci-cd.yaml
-│   └── mcp-servers.yaml
+│   ├── mcp-servers.yaml
+│   ├── security.yaml
+│   └── nvr.yaml
 │   # per-app Application CRs added here by provisioning workflow
 │
 └── scripts/
@@ -424,14 +506,15 @@ solomon/
 
 Solomon is Claude Code configured as a cluster manager via this repo's `CLAUDE.md` and the `/solomon` skill in `.claude/solomon.md`.
 
-There are no runtime services for Solomon (no API, no UI, no background agent). Solomon is invoked directly in a Claude Code session. It has full cluster access via MCP tools bridged through `scripts/mcp-proxy.py`.
+There are no runtime services for Solomon (no API, no UI, no background agent). Solomon is invoked directly in a Claude Code session — locally on agx-orin-prod-1 or over SSH from any laptop. It has full cluster access via MCP tools bridged through `scripts/mcp-proxy.py`.
 
-**Modes:**
-- **OPS** — diagnose and remediate cluster issues
-- **BUILD** — add/modify infrastructure or services (always use `claude --model opus`)
-- **DESIGN** — plan architecture, new services, migrations
+Two rules govern all Solomon sessions:
+- **Use `claude --model opus`** for any session making cluster or infrastructure changes
+- **Git is the source of truth** — never make persistent cluster changes outside of git
 
 **Session start:** run `/solomon` in the Claude Code CLI from this repo's directory.
+
+**Remote access:** SSH into agx-orin-prod-1 from any machine (Windows, Mac, multiple simultaneous sessions supported). Use tmux to keep sessions alive across disconnects. VS Code Remote SSH extension gives full IDE + terminal + auto port forwarding from your laptop.
 
 ---
 
