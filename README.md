@@ -61,32 +61,41 @@ Every application gets a Keycloak **resource server** client (audience validatio
 
 ### AI
 
-| Component | Purpose |
-|-----------|---------|
-| llama-server | NVIDIA Jetson AI Lab llama.cpp container — serves GGUF models (Muse Glimmer 30B) |
-| vllm | NVIDIA Jetson AI Lab vLLM container — serves HuggingFace models (MoE, concurrent requests) |
-| LiteLLM proxy | Unified LLM gateway — virtual keys, budgets, cost tracking, MCP aggregation, model aliases |
+**Local inference** (NVIDIA Jetson AGX Orin — only [Jetson AI Lab](https://www.jetson-ai-lab.com/models/) official containers):
 
-**Model policy:** only models with an official [Jetson AI Lab](https://www.jetson-ai-lab.com/models/) container are deployed. No community GGUFs. When adding a model, check jetson-ai-lab.com first — confirm the container, engine (llama.cpp vs vLLM), and AGX Orin compatibility. A HuggingFace token is required; store as a SealedSecret.
+| Component | Engine | Model | Notes |
+|-----------|--------|-------|-------|
+| llama-server | llama.cpp | Muse Glimmer 30B | GGUF, 131K ctx, ~25 tok/s, vision |
+| vllm | vLLM | Nemotron3 Nano 30B-A3B | MoE, ~3B active params, fast tier |
 
-**Current models:**
+Total loaded: ~25 GB of 61 GB unified memory. Both stay hot simultaneously.
 
-| Model | Engine | Size (loaded) | Context | Use |
-|-------|--------|---------------|---------|-----|
-| [Meta Muse Glimmer 30B](https://www.jetson-ai-lab.com/models/muse-glimmer-30b/) | llama.cpp | ~17 GB GGUF | 131K tokens | Primary agent reasoning, tool calls, vision, planning |
-| [Nemotron3 Nano 30B-A3B](https://www.jetson-ai-lab.com/models/) | vLLM | ~8 GB (MoE, 3B active) | — | Fast tier — quick calls, classification, routing |
+- Muse Glimmer auto-downloads 3 artifacts on first start (17 GB model + vision encoder + DFlash decoder). Needs HuggingFace token (SealedSecret).
+- Nemotron3 Nano auto-downloads from HuggingFace when vLLM starts (~15–20 GB). First startup is slow — subsequent restarts use the cached PVC.
 
-Total loaded memory: ~25 GB of 61 GB. Both stay hot simultaneously.
+**External providers** (accessed via LiteLLM, pay-as-you-go, no subscription):
 
-Muse Glimmer auto-downloads 3 artifacts on first start: main model (17 GB), perception encoder (vision), DFlash speculative decoder. ~25 tok/s on AGX Orin.
+| Provider | Models | Pricing |
+|----------|--------|---------|
+| [Together AI](https://www.together.ai/pricing) | GLM-5.2, GLM-5.3, Kimi K3, GLM-5.3 Flash | GLM-5.2: $1.40/$4.40 · Kimi K3: $3.00/$15.00 per 1M |
+| [Fireworks AI](https://fireworks.ai/pricing) | Muse Glimmer 30B (cloud), GLM-5.3 Flash | MG30B: $1.96/$4.88 · Flash: $0.225/$0.75 per 1M |
+| Anthropic | Claude Sonnet | Pay-per-token |
 
-**LiteLLM model aliases** (agents always use these — never raw model names or engine URLs):
+No OpenRouter — LiteLLM is the gateway. Adding OpenRouter would just insert a middleman with a markup between LiteLLM and the providers. Together AI and Fireworks connect directly.
 
-| Alias | Backing model | Use for |
-|-------|--------------|---------|
-| `smart` | Muse Glimmer 30B via llama-server | Reasoning, planning, tool chains, vision, long context |
-| `fast` | Nemotron3 Nano 30B-A3B via vLLM | High-frequency calls, routing, classification |
-| `external` | Claude Sonnet (Anthropic API) | Fallback when local is insufficient or unavailable |
+**LiteLLM proxy** — the single AI gateway for all agents and services:
+- Per-service virtual keys with spend limits
+- Model aliases (agents code against these — never raw model names or provider URLs)
+- Automatic fallback routing
+- Full usage logging
+
+| Alias | Primary | Fallback | Use for |
+|-------|---------|---------|---------|
+| `smart` | Muse Glimmer 30B (local) | Muse Glimmer 30B (Fireworks) | Reasoning, planning, tool chains, vision, long context |
+| `fast` | Nemotron3 Nano (local) | GLM-5.3 Flash (Together AI) | High-frequency calls, routing, classification |
+| `glm` | GLM-5.2 (Together AI) | GLM-5.3 (Together AI) | GLM-family tasks |
+| `kimi` | Kimi K3 (Together AI) | — | Kimi-specific workflows |
+| `external` | Claude Sonnet (Anthropic) | — | Quality ceiling, complex reasoning |
 
 ### CI/CD
 
