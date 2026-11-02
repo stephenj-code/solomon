@@ -1,0 +1,27 @@
+# Covers: cilium, cert-manager, storage, sealed-secrets, nvidia
+# ServerSideApply required — all four components install CRDs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: foundation
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stephenj-code/solomon
+    targetRevision: main
+    path: infrastructure/foundation
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,26 @@
+# Covers: cluster-level MCP servers (kubernetes, prometheus, database)
+# These are shared by all agents via LiteLLM MCP gateway.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-servers
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stephenj-code/solomon
+    targetRevision: main
+    path: infrastructure/mcp-servers
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-servers
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

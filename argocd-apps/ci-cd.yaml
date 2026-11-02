@@ -1,0 +1,28 @@
+# Covers: ARC controller (arc-systems) + build-runner ScaleSet (arc-runners)
+# Plain YAML — rendered from helm template once, committed as static manifests.
+# ServerSideApply required — ARC installs CRDs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ci-cd
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stephenj-code/solomon
+    targetRevision: main
+    path: infrastructure/ci-cd
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-systems
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,26 @@
+# ArgoCD self-management — syncs ArgoCD's own config from git.
+# selfHeal: false intentionally — prevents ArgoCD from overwriting
+# itself during upgrades. Sync manually when updating ArgoCD.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stephenj-code/solomon
+    targetRevision: main
+    path: infrastructure/gitops/argocd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

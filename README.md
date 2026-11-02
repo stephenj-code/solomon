@@ -63,21 +63,30 @@ Every application gets a Keycloak **resource server** client (audience validatio
 
 | Component | Purpose |
 |-----------|---------|
-| llama-server | Local LLM inference via NVIDIA Jetson AI Lab container — only NVIDIA-officially-supported models |
-| LiteLLM proxy | Unified LLM gateway — per-service virtual keys, budgets, cost tracking, MCP aggregation |
+| llama-server | NVIDIA Jetson AI Lab llama.cpp container — serves GGUF models (Muse Glimmer 30B) |
+| vllm | NVIDIA Jetson AI Lab vLLM container — serves HuggingFace models (MoE, concurrent requests) |
+| LiteLLM proxy | Unified LLM gateway — virtual keys, budgets, cost tracking, MCP aggregation, model aliases |
 
-**Current model:** Meta Muse Glimmer 30B (Q4_K_M, ~17 GB) — purpose-built for agentic workloads; native tool calling, multi-step reasoning, multimodal. Runs at ~25 tok/s on AGX Orin with DFlash speculative decoding. Apache 2.0.
+**Model policy:** only models with an official [Jetson AI Lab](https://www.jetson-ai-lab.com/models/) container are deployed. No community GGUFs. When adding a model, check jetson-ai-lab.com first — confirm the container, engine (llama.cpp vs vLLM), and AGX Orin compatibility. A HuggingFace token is required; store as a SealedSecret.
 
-**Model policy:** only models with an official NVIDIA Jetson AI Lab container are deployed. No community GGUFs, no Ollama. When a new model is needed, check [jetson-ai-lab.com](https://www.jetson-ai-lab.com) first. New models are added as a second `llama-server` Deployment — LiteLLM aliases route to the right one.
+**Current models:**
 
-**LiteLLM model aliases** (agents code against these, never raw model names):
+| Model | Engine | Size (loaded) | Context | Use |
+|-------|--------|---------------|---------|-----|
+| [Meta Muse Glimmer 30B](https://www.jetson-ai-lab.com/models/muse-glimmer-30b/) | llama.cpp | ~17 GB GGUF | 131K tokens | Primary agent reasoning, tool calls, vision, planning |
+| [Nemotron3 Nano 30B-A3B](https://www.jetson-ai-lab.com/models/) | vLLM | ~8 GB (MoE, 3B active) | — | Fast tier — quick calls, classification, routing |
+
+Total loaded memory: ~25 GB of 61 GB. Both stay hot simultaneously.
+
+Muse Glimmer auto-downloads 3 artifacts on first start: main model (17 GB), perception encoder (vision), DFlash speculative decoder. ~25 tok/s on AGX Orin.
+
+**LiteLLM model aliases** (agents always use these — never raw model names or engine URLs):
 
 | Alias | Backing model | Use for |
 |-------|--------------|---------|
-| `smart` | Muse Glimmer 30B (local) | Agent reasoning, planning, tool calls, code gen |
-| `external` | Claude Sonnet (Anthropic) | Fallback when local is insufficient or unavailable |
-
-Add a `fast` alias when a second NVIDIA-supported small model is deployed.
+| `smart` | Muse Glimmer 30B via llama-server | Reasoning, planning, tool chains, vision, long context |
+| `fast` | Nemotron3 Nano 30B-A3B via vLLM | High-frequency calls, routing, classification |
+| `external` | Claude Sonnet (Anthropic API) | Fallback when local is insufficient or unavailable |
 
 ### CI/CD
 
@@ -354,7 +363,8 @@ solomon/
 │   │   ├── cloudnativepg/        # operator + shared cluster
 │   │   └── databases/            # per-app Database CRDs (added by provisioning)
 │   ├── ai/
-│   │   ├── llama-server/         # NVIDIA Jetson AI Lab inference container
+│   │   ├── llama-server/         # llama.cpp container — Muse Glimmer 30B (GGUF)
+│   │   ├── vllm/                 # vLLM container — Nemotron3 Nano 30B-A3B (MoE)
 │   │   └── litellm/
 │   ├── backup/
 │   │   ├── minio/

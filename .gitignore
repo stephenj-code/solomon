@@ -1,0 +1,4 @@
+scripts/sealed-secrets.pem
+*.env
+.env.*
+.env

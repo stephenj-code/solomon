@@ -1,0 +1,31 @@
+# Root Application — applied once manually during bootstrap.
+# After this, ArgoCD manages all child Applications in argocd-apps/.
+#
+# Apply with:
+#   kubectl apply -f argocd-apps/_root.yaml
+#
+# Then watch:
+#   kubectl -n argocd get applications -w
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stephenj-code/solomon
+    targetRevision: main
+    path: argocd-apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
