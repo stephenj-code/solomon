@@ -37,6 +37,11 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: nvr
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: agents
 ---
 apiVersion: v1

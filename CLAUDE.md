@@ -93,14 +93,17 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | `arc-systems` | ARC controller |
 | `arc-runners` | Ephemeral GitHub Actions runner pods |
 | `argocd` | ArgoCD |
-| `auth` | Keycloak, oauth2-proxy |
-| `ai` | llama-server (llama.cpp, Muse Glimmer 30B), vllm (Nemotron3 Nano 30B-A3B), LiteLLM proxy |
-| `backup` | Velero, MinIO |
-| `database` | CloudNativePG operator + shared postgres cluster |
-| `mcp-servers` | Cluster-level MCP servers (kubernetes, prometheus, database) |
+| `auth` | Keycloak, oauth2-proxy, **keycloak-agent** |
+| `ai` | llama-server (llama.cpp, Muse Glimmer 30B), vllm (Nemotron3 Nano 30B-A3B), LiteLLM proxy, **litellm-agent** |
+| `backup` | Velero, MinIO, **backup-agent** |
+| `database` | CloudNativePG operator + shared postgres cluster, **database-agent** |
+| `mcp-servers` | Cluster-level MCP servers (kubernetes, prometheus, database) — Solomon tools only |
 | `mcp-external` | Third-party MCP servers (network-isolated) |
-| `observability` | Prometheus, Grafana, Loki, Promtail, Kiali, Jaeger |
-| `agents` | LangGraph agents (each agent gets its own namespace when isolated) |
+| `nvr` | Frigate NVR, **frigate-agent** |
+| `observability` | Prometheus, Grafana, Loki, Promtail, Kiali, Jaeger, **grafana-agent**, **loki-agent** |
+| `agents` | Cross-cutting agents with no natural home namespace |
+
+**Agent co-location rule:** agents live in their tool's namespace. The `agents` namespace is a catch-all only for agents that span multiple tools or have no natural home.
 
 Each application, agent, and UI gets its own namespace provisioned via the cookiecutter workflow.
 
