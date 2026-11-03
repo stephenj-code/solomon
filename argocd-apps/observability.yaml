@@ -1,10 +1,14 @@
-# Covers: Prometheus, Grafana, Loki, Promtail, Kiali, Jaeger
-# ServerSideApply required — Prometheus Operator installs CRDs.
+# Covers: Loki, Promtail, Kiali, Jaeger, HTTPRoutes, custom PrometheusRules.
+# Prometheus + Grafana + AlertManager are managed by the 'prometheus' Helm app (wave 5).
+# Wave 6: depends on Prometheus Operator CRDs from that Helm app.
+# ServerSideApply required for PrometheusRule / ServiceMonitor CRs.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: observability
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 5 — AI stack**
+**Current active phase: Phase 6 — Observability**
 
 ---
 
@@ -76,12 +76,13 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 6 — Observability
 
-- [ ] Write Prometheus manifests (`infrastructure/observability/prometheus/`)
-- [ ] Write Grafana manifests (`infrastructure/observability/grafana/`)
-- [ ] Write Loki manifests (`infrastructure/observability/loki/`)
-- [ ] Write Promtail DaemonSet (`infrastructure/observability/promtail/`)
-- [ ] Write Kiali manifests (`infrastructure/observability/kiali/`)
-- [ ] Write Jaeger manifests (`infrastructure/observability/jaeger/`)
+- [x] Write Prometheus manifests — kube-prometheus-stack Helm app (`argocd-apps/prometheus.yaml`); includes Prometheus, Grafana, AlertManager, node-exporter, kube-state-metrics
+- [x] Write Grafana manifests — managed by kube-prometheus-stack; HTTPRoute at `infrastructure/observability/grafana/httproute.yaml`
+- [x] Write Loki manifests (`infrastructure/observability/loki/deployment.yaml`) — single-binary, 30d retention, 20Gi PVC
+- [x] Write Promtail DaemonSet (`infrastructure/observability/promtail/daemonset.yaml`) — all nodes, ships to Loki
+- [x] Write Kiali manifests (`infrastructure/observability/kiali/deployment.yaml`) — standalone, HTTPRoute
+- [x] Write Jaeger manifests (`infrastructure/observability/jaeger/deployment.yaml`) — all-in-one, in-memory, HTTPRoute
+- [ ] **RUNTIME**: Seal grafana-admin → `infrastructure/observability/grafana/grafana-admin-sealed.yaml`
 
 ---
 

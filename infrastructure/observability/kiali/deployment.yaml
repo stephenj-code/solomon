@@ -1,0 +1,178 @@
+# Kiali — Istio service mesh visualization.
+# Connects to Prometheus for metrics and the Kubernetes API for topology.
+# Deployed standalone (no Kiali Operator) for simplicity.
+#
+# Port: 20001 (Kiali default)
+# External access: kiali.project-solomon.ai via HTTPRoute.
+#
+# ClusterRole gives Kiali read access to Istio resources and all workloads.
+# Kiali connects to Prometheus at prometheus-operated.observability:9090.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kiali
+  namespace: observability
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kiali
+rules:
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - endpoints
+      - namespaces
+      - nodes
+      - pods
+      - pods/log
+      - replicationcontrollers
+      - services
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [cronjobs, jobs]
+    verbs: [get, list, watch]
+  - apiGroups:
+      - networking.istio.io
+      - security.istio.io
+      - gateway.networking.k8s.io
+    resources: ["*"]
+    verbs: [get, list, watch]
+  - apiGroups: [apps.openshift.io]
+    resources: [deploymentconfigs]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kiali
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kiali
+subjects:
+  - kind: ServiceAccount
+    name: kiali
+    namespace: observability
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiali-config
+  namespace: observability
+data:
+  config.yaml: |
+    auth:
+      strategy: anonymous
+    deployment:
+      accessible_namespaces:
+        - "**"
+    external_services:
+      prometheus:
+        url: http://prometheus-operated.observability.svc.cluster.local:9090
+      tracing:
+        enabled: true
+        in_cluster_url: http://jaeger.observability.svc.cluster.local:16686
+        provider: jaeger
+      grafana:
+        enabled: true
+        in_cluster_url: http://grafana.observability.svc.cluster.local:80
+        url: https://grafana.project-solomon.ai
+    server:
+      port: 20001
+      web_root: /kiali
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiali
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kiali
+  template:
+    metadata:
+      labels:
+        app: kiali
+    spec:
+      serviceAccountName: kiali
+      containers:
+        - name: kiali
+          image: quay.io/kiali/kiali:v1.82
+          command:
+            - /opt/kiali/kiali
+            - -config
+            - /kiali-configuration/config.yaml
+          ports:
+            - containerPort: 20001
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: kiali-config
+              mountPath: /kiali-configuration
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /kiali/healthz
+              port: 20001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /kiali/healthz
+              port: 20001
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+      volumes:
+        - name: kiali-config
+          configMap:
+            name: kiali-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiali
+  namespace: observability
+spec:
+  selector:
+    app: kiali
+  ports:
+    - port: 20001
+      targetPort: 20001
+      name: http
+---
+# HTTPRoute — kiali.project-solomon.ai
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kiali
+  namespace: observability
+spec:
+  parentRefs:
+    - name: main
+      namespace: istio-system
+      sectionName: https
+    - name: main
+      namespace: istio-system
+      sectionName: http
+  hostnames:
+    - kiali.project-solomon.ai
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: kiali
+          port: 20001

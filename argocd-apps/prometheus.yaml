@@ -1,0 +1,148 @@
+# kube-prometheus-stack — Helm app.
+# Wave 5: installs Prometheus Operator CRDs + Prometheus + Grafana + AlertManager
+# + node-exporter DaemonSet + kube-state-metrics.
+# The 'observability' directory app (wave 6) depends on the Prometheus CRDs for
+# PrometheusRule and ServiceMonitor resources.
+#
+# Stateful components (Prometheus, Grafana, AlertManager) are pinned to
+# agx-orin-prod-1 via nodeSelector so their PVCs land on the 1TB SSD
+# at /data/local-path-provisioner/ (see foundation/storage/).
+#
+# Grafana service name overridden to "grafana" for predictable HTTPRoute targeting.
+# Prometheus service: prometheus-operated:9090 (created by operator).
+# AlertManager service: alertmanager-operated:9093 (created by operator).
+#
+# HTTPRoutes for external access live in infrastructure/observability/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 65.1.1
+    helm:
+      values: |
+        # ── Prometheus ───────────────────────────────────────────────────────────
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            retentionSize: 18GB
+            nodeSelector:
+              kubernetes.io/hostname: agx-orin-prod-1
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes: [ReadWriteOnce]
+                  resources:
+                    requests:
+                      storage: 20Gi
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                memory: 2Gi
+
+        # ── AlertManager ─────────────────────────────────────────────────────────
+        alertmanager:
+          alertmanagerSpec:
+            nodeSelector:
+              kubernetes.io/hostname: agx-orin-prod-1
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes: [ReadWriteOnce]
+                  resources:
+                    requests:
+                      storage: 2Gi
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+
+        # ── Grafana ───────────────────────────────────────────────────────────────
+        grafana:
+          fullnameOverride: grafana
+          nodeSelector:
+            kubernetes.io/hostname: agx-orin-prod-1
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          persistence:
+            enabled: true
+            storageClassName: local-path
+            size: 5Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          # Loki datasource — Loki runs as plain manifest in observability namespace.
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              url: http://loki.observability.svc.cluster.local:3100
+              access: proxy
+              isDefault: false
+          adminPassword: ""  # Set via grafana-admin SealedSecret (key: admin-password)
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          # Jaeger datasource for trace correlation
+          # Jaeger query runs at jaeger.observability.svc.cluster.local:16686
+          grafana.ini:
+            server:
+              root_url: https://grafana.project-solomon.ai
+            auth:
+              disable_login_form: false
+
+        # ── node-exporter ─────────────────────────────────────────────────────────
+        # DaemonSet — runs on all 3 nodes. No pinning needed.
+        nodeExporter:
+          enabled: true
+
+        # ── kube-state-metrics ───────────────────────────────────────────────────
+        kubeStateMetrics:
+          enabled: true
+
+        # ── Prometheus Operator ──────────────────────────────────────────────────
+        prometheusOperator:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
