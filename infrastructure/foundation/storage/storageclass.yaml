@@ -1,0 +1,12 @@
+# Default StorageClass — uses local-path provisioner on agx-orin-prod-1.
+# Provisions PVCs as directories on the 1TB SSD at /data/local-path-provisioner/.
+# annotated as default so PVCs without an explicit storageClassName get this.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-path
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: rancher.io/local-path
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete

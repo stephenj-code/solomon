@@ -1,0 +1,37 @@
+# Cilium v1.16.0 — Helm values for project-solomon
+#
+# Key constraints:
+#   kubeProxyReplacement: false  — keep kube-proxy; required for Istio ambient
+#     compatibility (ztunnel manages L4, Cilium handles L3 + NetworkPolicy)
+#   cni.exclusive: false         — allow Istio ztunnel to also configure pod
+#     networking alongside Cilium
+#   operator.replicas: 1         — 3-node cluster, single operator replica is fine
+#
+# Applied by bootstrap.sh (before ArgoCD) via:
+#   helm install cilium cilium/cilium --version 1.16.0 \
+#     --namespace kube-system -f infrastructure/foundation/cilium/values.yaml
+#
+# Managed by ArgoCD after bootstrap via kustomization.yaml (helmCharts).
+
+kubeProxyReplacement: false
+
+cni:
+  exclusive: false     # coexist with Istio ztunnel
+
+ipam:
+  mode: kubernetes     # use per-node pod CIDR from kubeadm --pod-network-cidr
+
+operator:
+  replicas: 1
+
+nodeinit:
+  enabled: true
+
+# ARM64 / Jetson: no special config needed — Cilium ships multi-arch images
+
+# Hubble (observability) — disabled for now, enable when observability stack is up
+hubble:
+  relay:
+    enabled: false
+  ui:
+    enabled: false

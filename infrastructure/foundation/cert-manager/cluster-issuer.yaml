@@ -1,0 +1,30 @@
+# ClusterIssuer — Let's Encrypt production via Cloudflare DNS-01.
+# DNS-01 is required for wildcard certificates (*.project-solomon.ai).
+#
+# Requires: cloudflare-api-token Secret in cert-manager namespace.
+# Create after Sealed Secrets controller is up:
+#
+#   kubectl create secret generic cloudflare-api-token \
+#     --namespace cert-manager \
+#     --from-literal=api-token=<YOUR_CF_TOKEN> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/foundation/cert-manager/cloudflare-api-token-sealed.yaml
+#
+# The Cloudflare API token needs: Zone / DNS / Edit permission on project-solomon.ai.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: stephen@project-solomon.ai
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token

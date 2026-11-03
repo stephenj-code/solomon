@@ -1,0 +1,18 @@
+# Wildcard TLS certificate for *.project-solomon.ai
+# Issued by letsencrypt-prod ClusterIssuer via Cloudflare DNS-01.
+# Stored as Secret `wildcard-tls` in istio-system namespace —
+# referenced by the Istio IngressGateway.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-project-solomon-ai
+  namespace: istio-system
+spec:
+  secretName: wildcard-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.project-solomon.ai"
+  dnsNames:
+    - "*.project-solomon.ai"
+    - "project-solomon.ai"

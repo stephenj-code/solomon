@@ -3,20 +3,18 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 1 — Foundation manifests**
+**Current active phase: Phase 2 — Networking**
 
 ---
 
-## Phase 1 — Foundation manifests
+## Phase 1 — Foundation manifests ✓
 
-Write all `infrastructure/foundation/` manifests. These must be applied manually before ArgoCD takes over (chicken-and-egg).
-
-- [ ] Write Cilium manifests (`infrastructure/foundation/cilium/`) — CNI, `kubeProxyReplacement=false`
-- [ ] Write Sealed Secrets manifests (`infrastructure/foundation/sealed-secrets/`) — controller install
-- [ ] Write NVIDIA GPU operator manifests (`infrastructure/foundation/nvidia/`) — Jetson runtime class
-- [ ] Write local-path provisioner manifests (`infrastructure/foundation/storage/`) — dynamic PVCs on 1TB SSD
-- [ ] Write cert-manager manifests (`infrastructure/foundation/cert-manager/`) — wildcard TLS via Cloudflare DNS-01
-- [ ] Verify `scripts/bootstrap.sh` sequence matches new repo structure
+- [x] Write Cilium manifests (`infrastructure/foundation/cilium/`) — `values.yaml` for Helm; bootstrap.sh installs via `helm install`
+- [x] Write Sealed Secrets manifests (`infrastructure/foundation/sealed-secrets/controller.yaml`) — upstream v0.27.0 plain YAML
+- [x] Write NVIDIA manifests (`infrastructure/foundation/nvidia/`) — `runtimeclass.yaml` + `device-plugin.yaml` (pinned to agx-orin-prod-1)
+- [x] Write local-path provisioner manifests (`infrastructure/foundation/storage/`) — upstream v0.0.26 + default StorageClass
+- [x] Write cert-manager manifests (`infrastructure/foundation/cert-manager/`) — upstream v1.15.0 + ClusterIssuer (Cloudflare DNS-01) + wildcard Certificate
+- [x] Update `scripts/bootstrap.sh` — installs Helm, Cilium, Sealed Secrets, then ArgoCD; full annotated sequence
 
 ---
 
