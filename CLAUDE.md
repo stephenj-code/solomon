@@ -7,7 +7,7 @@ This is the platform repo for **project-solomon**: a self-hosted 3-node Kubernet
 - `infrastructure/` — All cluster manifests, synced by ArgoCD
 - `argocd-apps/` — ArgoCD Application CRs (app-of-apps pattern)
 - `scripts/` — Bootstrap scripts and MCP proxy bridges
-- `.claude/` — Solomon skill files
+- `.claude/commands/` — Solomon slash commands (`/solomon` session init)
 - `MIGRATION.md` — Cluster build/migration task checklist
 
 ## Quick start
