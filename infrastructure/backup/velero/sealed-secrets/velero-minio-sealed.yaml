@@ -1,0 +1,21 @@
+# PLACEHOLDER — seal and replace this file before Phase 13 (migration execution).
+#
+# Creates: velero-minio Secret in velero namespace
+# Key:     cloud  (AWS credentials file format — required by velero-plugin-for-aws)
+#
+# The value must be a credentials file with this exact format:
+#   [default]
+#   aws_access_key_id=<minio-root-user>
+#   aws_secret_access_key=<minio-root-password>
+#
+# Use the same credentials as minio-root (MINIO_ROOT_USER / MINIO_ROOT_PASSWORD).
+#
+# Sealing command:
+#   kubectl create secret generic velero-minio \
+#     --namespace velero \
+#     --from-literal=cloud="$(printf '[default]\naws_access_key_id=<key>\naws_secret_access_key=<secret>')" \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/backup/velero/sealed-secrets/velero-minio-sealed.yaml
+#
+# Replace this entire file with the kubeseal output.

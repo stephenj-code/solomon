@@ -1,0 +1,36 @@
+# Velero Schedule — daily cluster backup at 02:00 UTC.
+# Covers all stateful namespaces. PVC data backed up via kopia (node-agent).
+# Retention: 30 days (720h).
+#
+# Backup storage: MinIO at http://minio.backup.svc.cluster.local:9000 (velero bucket).
+# Configured in the velero Helm app (argocd-apps/velero.yaml).
+#
+# To trigger an immediate backup:
+#   velero backup create manual-$(date +%Y%m%d) --from-schedule daily-backup
+#
+# To list backups:
+#   velero backup get
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-backup
+  namespace: velero
+spec:
+  # 02:00 UTC daily — after midnight maintenance window.
+  schedule: "0 2 * * *"
+  template:
+    includedNamespaces:
+      - auth
+      - database
+      - ai
+      - backup
+      - observability
+      - solomon
+      - mcp-servers
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+    # kopia filesystem backup for all PVCs.
+    defaultVolumesToFSBackup: true
+    # Retain backups for 30 days.
+    ttl: 720h0m0s

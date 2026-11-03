@@ -1,0 +1,94 @@
+# Velero — Helm app.
+# Wave 6: after auth (wave 5). Installs CRDs + Velero in velero namespace.
+# The 'backup' app (wave 7) depends on these CRDs for Schedule CRs.
+#
+# Uses MinIO (backup namespace, port 9000) as S3-compatible backup storage.
+# node-agent DaemonSet enabled for kopia-based PVC filesystem backup.
+# AWS S3 plugin installed as init container for MinIO compatibility.
+#
+# Credentials: velero-minio SealedSecret in velero namespace.
+# Secret key "cloud" must contain an AWS credentials file:
+#   [default]
+#   aws_access_key_id=<minio-root-user>
+#   aws_secret_access_key=<minio-root-password>
+#
+# Seal velero-minio:
+#   kubectl create secret generic velero-minio \
+#     --namespace velero \
+#     --from-literal=cloud='[default]
+#   aws_access_key_id=<key>
+#   aws_secret_access_key=<secret>' \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/backup/velero/sealed-secrets/velero-minio-sealed.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://vmware-tanzu.github.io/helm-charts
+    chart: velero
+    targetRevision: 7.1.0
+    helm:
+      values: |
+        # AWS plugin init container for S3-compatible MinIO storage.
+        initContainers:
+          - name: velero-plugin-for-aws
+            image: velero/velero-plugin-for-aws:v1.10.0
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+
+        # Read credentials from SealedSecret velero-minio in velero namespace.
+        credentials:
+          useSecret: true
+          existingSecret: velero-minio
+
+        configuration:
+          backupStorageLocation:
+            - name: default
+              provider: aws
+              bucket: velero
+              config:
+                region: minio
+                s3ForcePathStyle: "true"
+                s3Url: http://minio.backup.svc.cluster.local:9000
+
+          volumeSnapshotLocation:
+            - name: default
+              provider: aws
+              config:
+                region: minio
+
+          # Use kopia (file-system backup) for PVC volumes — no CSI snapshots needed.
+          defaultVolumesToFSBackup: true
+
+        # node-agent DaemonSet runs kopia on each node for PVC backup.
+        nodeAgent:
+          enabled: true
+
+        deployNodeAgent: true
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: velero
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,11 +1,15 @@
-# Covers: CloudNativePG operator + shared postgres cluster
-# ServerSideApply required — CloudNativePG installs CRDs.
-# databases/ subdir holds per-app Database CRDs added by provisioning workflow.
+# Covers: shared Cluster CR + per-app Database CRDs (databases/ subdir).
+# Wave 7: after cloudnativepg Helm app (wave 6) — CNPG CRDs must exist before
+# the Cluster CR can be synced.
+# Operator itself is managed by argocd-apps/cloudnativepg.yaml (Helm, wave 6).
+# databases/ subdir holds per-app Database CRDs added by the provisioning workflow.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: database
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

@@ -46,12 +46,12 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 4 — Data
 
-- [ ] Write CloudNativePG operator manifests (`infrastructure/database/cloudnativepg/`)
-- [ ] Write shared postgres cluster manifest (`infrastructure/database/cluster.yaml`)
-- [ ] Write MinIO manifests (`infrastructure/backup/minio/`) — object storage on 1TB SSD
-- [ ] Write Velero manifests (`infrastructure/backup/velero/`) — scheduled backups to MinIO
-- [ ] Seal MinIO root credentials
-- [ ] Seal Velero MinIO credentials
+- [x] Write CloudNativePG operator manifests (`argocd-apps/cloudnativepg.yaml` — Helm, wave 6)
+- [x] Write shared postgres cluster manifest (`infrastructure/database/cluster.yaml`)
+- [x] Write MinIO manifests (`infrastructure/backup/minio/`) — StatefulSet, 800Gi PVC, setup Job
+- [x] Write Velero manifests (`argocd-apps/velero.yaml` — Helm, wave 6; schedule in `infrastructure/backup/velero/`)
+- [ ] **RUNTIME**: Seal minio-root → `infrastructure/backup/minio/sealed-secrets/minio-root-sealed.yaml`
+- [ ] **RUNTIME**: Seal velero-minio → `infrastructure/backup/velero/sealed-secrets/velero-minio-sealed.yaml`
 
 ---
 

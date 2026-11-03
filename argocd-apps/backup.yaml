@@ -1,9 +1,14 @@
-# Covers: MinIO (local 1TB SSD bucket), Velero
+# Covers: MinIO StatefulSet + minio-setup Job + Velero Schedule CRs.
+# Wave 7: after velero Helm app (wave 6) — Velero CRDs must exist before
+# Schedule CRs can be synced. MinIO itself has no wave dependency.
+# Velero operator is managed by argocd-apps/velero.yaml (Helm, wave 6).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: backup
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
   finalizers:
     - resources-finalizer.argocd.io
 spec:
