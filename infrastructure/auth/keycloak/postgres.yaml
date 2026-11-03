@@ -34,6 +34,12 @@ spec:
         app: keycloak-postgres
     spec:
       serviceAccountName: keycloak-postgres
+      nodeSelector:
+        kubernetes.io/hostname: agx-orin-prod-1
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: postgres
           image: postgres:16.3

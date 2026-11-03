@@ -28,6 +28,16 @@ spec:
     size: 50Gi
     storageClass: local-path
 
+  # Pin to agx-orin-prod-1 — 1TB SSD is only on this node.
+  # local-path PVC will land on /data/local-path-provisioner/ (see foundation/storage/).
+  affinity:
+    nodeSelector:
+      kubernetes.io/hostname: agx-orin-prod-1
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
   # CNPG manages the superuser secret automatically when not specified.
   # Retrieve credentials post-deploy:
   #   kubectl get secret shared-superuser -n database \
