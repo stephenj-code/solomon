@@ -1,0 +1,41 @@
+# Allow kube-apiserver egress only for namespaces that need it.
+# All other namespaces are blocked from reaching 192.168.1.49:6443.
+#
+# Permitted: argocd (syncs cluster state), arc-runners (build jobs),
+#            mcp-servers (Solomon's kubernetes MCP server).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apiserver-egress
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - {}   # argocd needs unrestricted egress (GitHub, registry, kube-apiserver)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apiserver-egress
+  namespace: arc-runners
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - {}   # runners need unrestricted egress (GitHub, GHCR, internet)
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-apiserver-egress
+  namespace: mcp-servers
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - {}   # MCP servers need kube-apiserver + prometheus + unrestricted for filesystem

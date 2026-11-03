@@ -1,0 +1,37 @@
+# Istio control plane — ambient profile.
+# Wave 1: after CRDs (istio-base), before CNI/ztunnel.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-istiod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: istiod
+    targetRevision: 1.23.0
+    helm:
+      values: |
+        profile: ambient
+        meshConfig:
+          accessLogFile: /dev/stdout
+          enableTracing: true
+          defaultConfig:
+            tracing:
+              zipkin:
+                address: jaeger-collector.observability.svc.cluster.local:9411
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

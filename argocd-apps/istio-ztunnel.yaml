@@ -1,0 +1,32 @@
+# ztunnel — L4 transparent proxy DaemonSet for Istio ambient mTLS.
+# Runs on every node. Intercepts pod-to-pod traffic and encrypts with mTLS.
+# Each pod gets a SPIFFE identity: spiffe://cluster.local/ns/<ns>/sa/<sa>
+# Wave 2: parallel with istio-cni, after istiod.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-ztunnel
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: ztunnel
+    targetRevision: 1.23.0
+    helm:
+      values: |
+        # No special values needed for basic ambient mode on ARM64/Jetson
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,61 @@
+# Istio IngressGateway — single cluster entry point.
+#
+# Two exposure paths:
+#   LAN:      externalIPs: [192.168.1.49] port 443 — dnsmasq resolves *.project-solomon.ai → 192.168.1.49
+#   Internet: cloudflared connects to ClusterIP port 80 — Cloudflare Tunnel handles TLS externally
+#
+# Pinned to agx-orin-prod-1 (control-plane node, fixed IP 192.168.1.49).
+# Wave 3: after istiod, cni, ztunnel.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-ingressgateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: gateway
+    targetRevision: 1.23.0
+    helm:
+      values: |
+        name: istio-ingressgateway
+        service:
+          type: ClusterIP
+          externalIPs:
+            - 192.168.1.49
+          ports:
+            - name: http
+              port: 80
+              targetPort: 80
+              protocol: TCP
+            - name: https
+              port: 443
+              targetPort: 443
+              protocol: TCP
+        nodeSelector:
+          kubernetes.io/hostname: agx-orin-prod-1
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

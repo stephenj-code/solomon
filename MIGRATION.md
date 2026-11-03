@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 2 — Networking**
+**Current active phase: Phase 3 — Auth**
 
 ---
 
@@ -18,13 +18,16 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ---
 
-## Phase 2 — Networking
+## Phase 2 — Networking ✓
 
-- [ ] Write Istio ambient mode manifests (`infrastructure/networking/istio/`) — ztunnel, IngressGateway, GatewayClass
-- [ ] Write Gateway + wildcard Gateway manifest (`infrastructure/networking/istio/gateway.yaml`)
-- [ ] Write cloudflared deployment (`infrastructure/networking/cloudflared/`)
-- [ ] Configure dnsmasq on agx-orin-prod-1 (split DNS — `*.project-solomon.ai` → 192.168.1.49)
-- [ ] Write Cilium NetworkPolicy manifests — API server access, cross-namespace, egress rules
+- [x] Write Istio ArgoCD Helm apps with sync waves 0-4 (`argocd-apps/istio-*.yaml`) — base, istiod, cni, ztunnel, ingressgateway
+- [x] Write GatewayClass + Gateway (`infrastructure/networking/istio/`) — wildcard listener :443 HTTPS + :80 HTTP for cloudflared
+- [x] IngressGateway — ClusterIP + externalIPs: [192.168.1.49], pinned to agx-orin-prod-1, tolerates control-plane taint
+- [x] Write cloudflared Deployment (`infrastructure/networking/cloudflared/`) — 2 replicas, token from SealedSecret
+- [x] Write dnsmasq config (`scripts/dnsmasq-project-solomon.conf`) — split DNS, *.project-solomon.ai → 192.168.1.49
+- [x] Write Cilium NetworkPolicy manifests — API server access, observability scraping, internet egress restrictions
+- [ ] **RUNTIME**: Install dnsmasq on agx-orin-prod-1 and copy config (run during migration execution, Phase 13)
+- [ ] **RUNTIME**: Seal cloudflare-tunnel-token → `infrastructure/networking/cloudflared/tunnel-token-sealed.yaml`
 
 ---
 

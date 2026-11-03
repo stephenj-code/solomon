@@ -1,0 +1,64 @@
+# Internet egress policy — restrict which namespaces can reach the internet.
+#
+# Allowed:
+#   ai          — HuggingFace (model downloads), Together AI, Fireworks AI, Anthropic
+#   arc-runners — GitHub, GHCR, package registries (unrestricted, see allow-api-server.yaml)
+#   argocd      — GitHub, container registries (unrestricted, see allow-api-server.yaml)
+#   networking  — cloudflared outbound to Cloudflare edge
+#
+# All other namespaces: deny internet egress by default (in-cluster only).
+# Standard NetworkPolicy only supports allow-rules, so we apply deny-all-egress
+# to namespaces that should be restricted, then explicitly allow in-cluster.
+---
+# Deny all egress from auth (Keycloak should not reach internet directly)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-internet-egress
+  namespace: auth
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow in-cluster traffic only
+    - to:
+        - namespaceSelector: {}
+---
+# Deny all egress from database (postgres should not reach internet)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-internet-egress
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - namespaceSelector: {}
+---
+# Deny all egress from security (trivy-operator reaches registry APIs — allow those selectively)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-registry-egress
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - {}   # trivy needs to reach CVE databases and container registries

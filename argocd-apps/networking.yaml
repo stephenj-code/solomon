@@ -1,10 +1,14 @@
-# Covers: istio (ambient mode + IngressGateway), cloudflared
-# ServerSideApply required — Istio installs a large set of CRDs.
+# Covers: Istio custom resources (GatewayClass, Gateway), cloudflared, NetworkPolicies.
+# Istio control-plane (base, istiod, cni, ztunnel, ingressgateway) managed by
+# separate istio-*.yaml ArgoCD Helm apps — sync waves 0-3.
+# Wave 4: runs after all Istio components are ready.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: networking
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

@@ -1,0 +1,8 @@
+# GatewayClass — tells Kubernetes Gateway API that Istio is the controller.
+# Required before any Gateway or HTTPRoute resources can be created.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: istio
+spec:
+  controllerName: istio.io/gateway-controller
