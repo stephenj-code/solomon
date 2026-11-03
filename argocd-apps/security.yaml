@@ -1,8 +1,14 @@
+# Covers: Trivy Operator custom resources, PrometheusRules for CVE alerting.
+# Trivy Operator CRDs are installed by the 'trivy-operator' Helm app (wave 6).
+# Wave 7: after Trivy CRDs (wave 6) and Prometheus CRDs (wave 5).
+# ServerSideApply required for ServiceMonitor / PrometheusRule CRs.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: security
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

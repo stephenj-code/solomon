@@ -1,0 +1,56 @@
+# ServiceMonitor — scrape Trivy Operator metrics into Prometheus.
+# Trivy exposes CVE counts, scan job durations, and queue depth on port 8080.
+# Grafana dashboards can then visualise vulnerability trends over time.
+#
+# Requires Prometheus Operator CRDs (from kube-prometheus-stack, wave 5).
+#
+# Useful PromQL queries:
+#   # Critical CVEs across all pods
+#   sum by (namespace) (trivy_image_vulnerabilities{severity="CRITICAL"})
+#
+#   # Any CRITICAL CVE firing
+#   trivy_image_vulnerabilities{severity="CRITICAL"} > 0
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: trivy-operator
+  namespace: security
+  labels:
+    # kube-prometheus-stack selects ServiceMonitors with this label by default.
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trivy-operator
+  namespaceSelector:
+    matchNames:
+      - security
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s
+---
+# PrometheusRule — alert on critical CVEs.
+# Fires if any running pod has a CRITICAL severity vulnerability for > 1h.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: trivy-critical-cves
+  namespace: security
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: trivy.rules
+      rules:
+        - alert: CriticalCVEDetected
+          expr: trivy_image_vulnerabilities{severity="CRITICAL"} > 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Critical CVE detected in {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: >
+              Pod {{ $labels.namespace }}/{{ $labels.pod }} has
+              {{ $value }} CRITICAL CVE(s) in image {{ $labels.image_tag }}.
+              Review with: kubectl get vulnerabilityreport -n {{ $labels.namespace }}

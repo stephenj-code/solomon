@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 6 — Observability**
+**Current active phase: Phase 7 — Security**
 
 ---
 
@@ -88,13 +88,13 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 7 — Security
 
-- [ ] Write Trivy Operator manifests (`infrastructure/security/trivy-operator/`)
-- [ ] Add Trivy image scan step to `solomon-app-template` CI workflow
-- [ ] Add Bandit + Semgrep SAST step to `solomon-app-template` CI workflow
-- [ ] Write Pod Security Standards admission config (baseline cluster-wide, restricted on `ai` + `auth`)
-- [ ] Configure etcd encryption at rest (`EncryptionConfiguration` in kubeadm)
-- [ ] Set up Renovate Bot on GitHub org (`stephenj-code`)
-- [ ] Add `argocd-apps/security.yaml` ArgoCD Application
+- [x] Write Trivy Operator manifests — Helm app `argocd-apps/trivy-operator.yaml` (wave 6); ServiceMonitor + PrometheusRule in `infrastructure/security/trivy-operator/`
+- [x] Write Pod Security Standards admission config — PSA labels on all namespaces in `infrastructure/namespaces/namespaces.yaml`; `restricted` on `auth`, `baseline` everywhere else (`ai` kept at baseline — GPU workloads incompatible with restricted)
+- [x] Configure etcd encryption at rest — `scripts/enable-etcd-encryption.sh`; run on agx-orin-prod-1 during Phase 13 after cluster is healthy; save generated AES key to KeePass
+- [x] Update `argocd-apps/security.yaml` — wave 7, updated comment
+- [ ] **EXTERNAL**: Add Trivy image scan step to `solomon-app-template` CI workflow (separate repo — `stephenj-code/solomon-app-template`)
+- [ ] **EXTERNAL**: Add Bandit + Semgrep SAST step to `solomon-app-template` CI workflow (separate repo)
+- [ ] **EXTERNAL**: Set up Renovate Bot on GitHub org (`stephenj-code`) — configure via `renovate.json` in each app repo or org-level config
 
 ---
 

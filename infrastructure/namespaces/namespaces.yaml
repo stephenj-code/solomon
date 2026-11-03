@@ -1,65 +1,114 @@
+# Pod Security Admission (PSA) labels are applied per namespace.
+# baseline  — blocks privileged containers, host namespaces, dangerous capabilities.
+#             Applied to all namespaces.
+# restricted — additionally requires runAsNonRoot, drop ALL caps, seccompProfile.
+#              Applied to auth only (keycloak + oauth2-proxy meet all requirements).
+#
+# ai namespace intentionally stays at baseline — llama-server and vllm use
+# Jetson AI Lab containers that run as root and require nvidia runtimeClass.
+# restricted would break GPU workloads.
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: networking
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: auth
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: ai
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: backup
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: database
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: mcp-servers
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: mcp-external
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: observability
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: nvr
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: security
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: agents
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: arc-systems
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: arc-runners
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline

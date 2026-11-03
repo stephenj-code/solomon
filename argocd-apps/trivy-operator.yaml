@@ -1,0 +1,61 @@
+# Trivy Operator — Helm app.
+# Wave 6: installs CRDs + operator in the security namespace.
+# The 'security' directory app (wave 7) can then use VulnerabilityReport CRDs
+# and ServiceMonitor resources (depends on Prometheus Operator CRDs from wave 5).
+#
+# The operator continuously scans all running pods and generates:
+#   VulnerabilityReport   — per-container CVE findings
+#   ConfigAuditReport     — Kubernetes config best-practice violations
+#   ExposedSecretReport   — secrets accidentally embedded in images
+#
+# Metrics exposed on port 8080 — scraped by Prometheus via ServiceMonitor
+# in infrastructure/security/trivy-operator/servicemonitor.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trivy-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://aquasecurity.github.io/helm-charts
+    chart: trivy-operator
+    targetRevision: 0.24.1
+    helm:
+      values: |
+        operator:
+          # Scan all namespaces except system namespaces.
+          # Never touch kube-system, kube-public, kube-node-lease (see CLAUDE.md).
+          excludeNamespaces: kube-system,kube-public,kube-node-lease
+          # Rescan every 24h so new CVEs surface without pod restarts.
+          scanJobTimeout: 5m
+
+        trivy:
+          # Use standalone mode — pulls vuln DB directly (no server needed).
+          mode: Standalone
+          # Offline DB updates via init container. Uses public ghcr.io DB.
+          dbRepository: ghcr.io/aquasecurity/trivy-db
+
+        serviceMonitor:
+          enabled: true
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: security
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
