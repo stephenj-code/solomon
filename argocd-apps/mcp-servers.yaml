@@ -1,10 +1,13 @@
-# Covers: cluster-level MCP servers (kubernetes, prometheus, database)
-# These are shared by all agents via LiteLLM MCP gateway.
+# Covers: solomon-kubernetes, solomon-prometheus, solomon-filesystem MCP servers
+# Wave 7: after observability (wave 6) for Prometheus, auth (wave 5) for AuthPolicy.
+# These are Solomon's tools only — individual agents use native LangGraph @tool functions.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: mcp-servers
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

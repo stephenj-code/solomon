@@ -1,5 +1,6 @@
 # Root Application — applied once manually during bootstrap.
 # After this, ArgoCD manages all child Applications in argocd-apps/.
+# No sync-wave annotation — this app bootstraps all others; waves are for children.
 #
 # Apply with:
 #   kubectl apply -f argocd-apps/_root.yaml

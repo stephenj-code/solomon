@@ -1,10 +1,13 @@
 # Covers: nvr namespace — Frigate ServiceEntry + HTTPRoute + frigate-agent
-# Frigate itself runs as Docker on agx-orin-prod-1 (not managed by ArgoCD)
+# Wave 6: after networking (wave 4) — needs Gateway + Istio mesh running.
+# Frigate itself runs as Docker on agx-orin-prod-1 (not managed by ArgoCD).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: nvr
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

@@ -1,10 +1,15 @@
 # Covers: cilium, cert-manager, storage, sealed-secrets, nvidia
+# Wave 1: after namespaces (wave 0). Installs cluster-wide CRDs and storage.
 # ServerSideApply required — all four components install CRDs.
+# Note: Cilium is also bootstrapped via scripts/bootstrap.sh on day 0.
+# ArgoCD then takes over ongoing reconciliation from wave 1 onward.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: foundation
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

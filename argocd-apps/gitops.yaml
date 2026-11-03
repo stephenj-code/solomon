@@ -1,6 +1,7 @@
 # ArgoCD self-management — syncs ArgoCD's own config from git.
-# selfHeal: false intentionally — prevents ArgoCD from overwriting
-# itself during upgrades. Sync manually when updating ArgoCD.
+# No sync-wave annotation — intentionally manual sync only.
+# selfHeal: false — prevents ArgoCD from overwriting itself during upgrades.
+# Sync manually after reviewing changes: argocd app sync gitops
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -1,10 +1,13 @@
-# Covers: llama-server (NVIDIA Jetson AI Lab container), LiteLLM proxy
-# Both pin to agx-orin-prod-1 via nodeSelector.
+# Covers: llama-server (Muse Glimmer 30B), vllm (Nemotron3 Nano), LiteLLM proxy
+# Wave 7: after auth (wave 5) for JWT/AuthPolicy, database (wave 7) for LiteLLM DB.
+# Both GPU workloads pin to agx-orin-prod-1 via nodeSelector.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: ai
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
   finalizers:
     - resources-finalizer.argocd.io
 spec:

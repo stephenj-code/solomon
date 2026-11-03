@@ -1,8 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
+# Wave 0: must sync before all other apps — namespaces must exist before
+# namespace-scoped resources are created by subsequent waves.
 metadata:
   name: namespaces
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.io
 spec:
