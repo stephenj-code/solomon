@@ -26,7 +26,16 @@ spec:
         name: sealed-secrets-controller
     spec:
       containers:
-      - args: []
+      - args:
+        # Disable automatic key rotation so the keypair stays stable.
+        # The private key must be backed up to KeePass after Phase 13:
+        #   kubectl get secret -n kube-system \
+        #     -l sealedsecrets.bitnami.com/sealed-secrets-key=active \
+        #     -o yaml
+        # Copy the output into a KeePass secure note. If the cluster is ever
+        # fully wiped and Velero cannot restore, re-import this secret before
+        # running bootstrap.sh so all existing SealedSecrets remain decryptable.
+        - --key-renew-period=0
         command:
         - controller
         env: []
