@@ -1,0 +1,46 @@
+# ARC controller — Actions Runner Controller Helm app.
+# Wave 5: installs CRDs + controller in arc-systems namespace.
+# The 'arc-runners' app (wave 6) depends on these CRDs for RunnerScaleSet resources.
+#
+# Watches for RunnerScaleSet CRs and manages ephemeral runner pod lifecycle.
+# Authenticates to GitHub via GitHub App (arc-github-app SealedSecret).
+#
+# GitHub App setup (RUNTIME — before Phase 13):
+#   1. Create a GitHub App at https://github.com/organizations/stephenj-code/settings/apps/new
+#      Permissions: Actions (read), Administration (read/write), Metadata (read)
+#      Install the app on the org.
+#   2. Note: App ID, Installation ID, private key (.pem file)
+#   3. Seal the credentials (see infrastructure/ci-cd/arc/sealed-secrets/.gitkeep)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://actions.github.io/actions-runner-controller-charts
+    chart: gha-runner-scale-set-controller
+    targetRevision: 0.9.3
+    helm:
+      values: |
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-systems
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

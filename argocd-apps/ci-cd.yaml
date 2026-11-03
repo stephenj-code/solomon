@@ -1,11 +1,15 @@
-# Covers: ARC controller (arc-systems) + build-runner ScaleSet (arc-runners)
-# Plain YAML — rendered from helm template once, committed as static manifests.
-# ServerSideApply required — ARC installs CRDs.
+# CI/CD extras — Docker layer cache PVC and sealed secrets for arc-runners.
+# ARC controller and runner scale set are managed by separate Helm apps:
+#   arc-controller (wave 5) — gha-runner-scale-set-controller
+#   arc-runners    (wave 6) — gha-runner-scale-set
+# Wave 6: alongside arc-runners; PVC must exist before runners scale up.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: ci-cd
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
   finalizers:
     - resources-finalizer.argocd.io
 spec:
@@ -18,11 +22,10 @@ spec:
       recurse: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: arc-systems
+    namespace: arc-runners
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true

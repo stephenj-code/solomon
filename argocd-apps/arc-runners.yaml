@@ -1,0 +1,122 @@
+# ARC runner scale set — ephemeral ARM64 build runners.
+# Wave 6: after arc-controller installs RunnerScaleSet CRDs.
+#
+# Runners are ephemeral: a pod is created per job, destroyed on completion.
+# Each runner pod has a Docker-in-Docker sidecar for image builds.
+# The Docker layer cache PVC (100Gi on agx-orin-prod-1) is shared across all
+# runner pods — cache persists across jobs, dramatically speeding up builds.
+#
+# Pinned to agx-orin-prod-1:
+#   - 1TB SSD hosts the Docker layer cache
+#   - ARM64 build target matches the Jetson nodes
+#   - Tolerates control-plane taint
+#
+# GitHub App credentials read from arc-github-app SealedSecret in arc-runners.
+# See infrastructure/ci-cd/arc/sealed-secrets/.gitkeep for sealing instructions.
+#
+# Runner label: "arc-solomon" — reference in workflow files:
+#   jobs:
+#     build:
+#       runs-on: arc-solomon
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arc-runners
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.io
+spec:
+  project: default
+  source:
+    repoURL: https://actions.github.io/actions-runner-controller-charts
+    chart: gha-runner-scale-set
+    targetRevision: 0.9.3
+    helm:
+      values: |
+        # GitHub org-level runner — available to all repos in stephenj-code org.
+        githubConfigUrl: https://github.com/stephenj-code
+
+        # GitHub App credentials (SealedSecret in arc-runners namespace).
+        githubConfigSecret: arc-github-app
+
+        # Scale 0→N on demand; never idle-waste RAM.
+        minRunners: 0
+        maxRunners: 5
+
+        # Runner label referenced in workflow `runs-on:` field.
+        runnerScaleSetName: arc-solomon
+
+        template:
+          spec:
+            nodeSelector:
+              kubernetes.io/hostname: agx-orin-prod-1
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+            initContainers:
+              # Ensure Docker data dir is owned by the DinD daemon user.
+              - name: fix-docker-perms
+                image: busybox:1.36
+                command: [sh, -c, "chown -R 0:0 /var/lib/docker"]
+                securityContext:
+                  runAsUser: 0
+                volumeMounts:
+                  - name: docker-cache
+                    mountPath: /var/lib/docker
+            containers:
+              - name: runner
+                image: ghcr.io/actions/actions-runner:latest
+                env:
+                  - name: DOCKER_HOST
+                    value: tcp://localhost:2376
+                  - name: DOCKER_TLS_VERIFY
+                    value: "1"
+                  - name: DOCKER_CERT_PATH
+                    value: /certs/client
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 512Mi
+                  limits:
+                    memory: 4Gi
+                volumeMounts:
+                  - name: docker-certs
+                    mountPath: /certs/client
+                    readOnly: true
+              - name: dind
+                image: docker:26-dind
+                securityContext:
+                  privileged: true
+                env:
+                  - name: DOCKER_TLS_CERTDIR
+                    value: /certs
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 512Mi
+                  limits:
+                    memory: 4Gi
+                volumeMounts:
+                  - name: docker-cache
+                    mountPath: /var/lib/docker
+                  - name: docker-certs
+                    mountPath: /certs
+            volumes:
+              - name: docker-cache
+                persistentVolumeClaim:
+                  claimName: arc-docker-layer-cache
+              - name: docker-certs
+                emptyDir: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-runners
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

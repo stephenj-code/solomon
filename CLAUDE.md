@@ -26,7 +26,7 @@ Run `/solomon` or say **"become solomon"** to initialize a session.
 - **HuggingFace token required** — llama-server and vllm pull models from HuggingFace on first start; token stored as SealedSecret in `ai` namespace
 - **Never modify** kube-system, kube-public, kube-node-lease namespaces
 - **Never store secrets in plaintext** — always Sealed Secrets (`kubeseal`); exception: Frigate RTSP creds live in `/data/frigate/.env` (chmod 600) on the host
-- **Every new service** must be provisioned via the `solomon-app-template` GitHub template repo
+- **Every new service** must be provisioned via `scripts/new-app.sh <name>` (uses `templates/app-template/` in this repo)
 - **After any infra change** — check `argocd-apps/` for stale or missing Application CRs
 - **Agent co-location** — agents live in their tool's namespace (see namespace inventory); `agents` namespace is catch-all only
 - **All agents registered in LiteLLM agent registry** — provisioning workflow handles this automatically
@@ -141,12 +141,14 @@ MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-se
 
 ## New service workflow
 
-Every new service, agent, or app starts from the `solomon-app-template` GitHub template repository.
+Every new service, agent, or app starts from `templates/app-template/` in this repo.
+The template lives here so it stays in sync with cluster design — no separate repo to drift.
 
 ```bash
-gh repo create my-agent --template stephenj-code/solomon-app-template --private
+scripts/new-app.sh my-agent
 ```
 
+This creates the GitHub repo, copies the template, substitutes the app name, and pushes.
 Edit `app.yaml` to describe what the app needs, then commit to `main`. The `provision.yaml` workflow runs automatically on first push and bootstraps all external dependencies.
 
 **What provisioning creates automatically** (driven by `app.yaml`):

@@ -1,0 +1,25 @@
+# Docker layer cache PVC — shared across all ephemeral ARC runner pods.
+# Mounted at /var/lib/docker in the DinD sidecar of each runner pod.
+# Persists the Docker build cache between jobs — avoids re-pulling base images
+# and re-running unchanged build stages on every workflow run.
+#
+# Pinned to agx-orin-prod-1 via the runner pod's nodeSelector, so local-path
+# provisioner places this on the 1TB SSD at /data/local-path-provisioner/.
+#
+# ReadWriteOnce — only one DinD daemon writes at a time. ARC's minRunners=0
+# means no runner pods exist when idle, so no concurrent access conflict.
+# If maxRunners > 1 concurrent jobs are needed in future, switch to a
+# shared filesystem (NFS / ReadWriteMany) or accept that concurrent jobs
+# will contend — Docker daemon handles locking internally.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arc-docker-layer-cache
+  namespace: arc-runners
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi

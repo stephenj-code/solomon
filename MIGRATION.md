@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 7 — Security**
+**Current active phase: Phase 8 — CI/CD**
 
 ---
 
@@ -92,20 +92,20 @@ Solomon reads this file on session start to surface the current phase and open t
 - [x] Write Pod Security Standards admission config — PSA labels on all namespaces in `infrastructure/namespaces/namespaces.yaml`; `restricted` on `auth`, `baseline` everywhere else (`ai` kept at baseline — GPU workloads incompatible with restricted)
 - [x] Configure etcd encryption at rest — `scripts/enable-etcd-encryption.sh`; run on agx-orin-prod-1 during Phase 13 after cluster is healthy; save generated AES key to KeePass
 - [x] Update `argocd-apps/security.yaml` — wave 7, updated comment
-- [ ] **EXTERNAL**: Add Trivy image scan step to `solomon-app-template` CI workflow (separate repo — `stephenj-code/solomon-app-template`)
-- [ ] **EXTERNAL**: Add Bandit + Semgrep SAST step to `solomon-app-template` CI workflow (separate repo)
+- [ ] Add Trivy image scan step to `templates/app-template/.github/workflows/` (Phase 11)
+- [ ] Add Bandit + Semgrep SAST step to `templates/app-template/.github/workflows/` (Phase 11)
 - [ ] **EXTERNAL**: Set up Renovate Bot on GitHub org (`stephenj-code`) — configure via `renovate.json` in each app repo or org-level config
 
 ---
 
 ## Phase 8 — CI/CD
 
-- [ ] Render ARC controller manifests from Helm (`infrastructure/ci-cd/arc/controller/`)
-- [ ] Write ARC runner set manifests (`infrastructure/ci-cd/arc/runners/build-runner/`)
-- [ ] Create GitHub App for ARC (replace PAT)
-- [ ] Seal GitHub App private key + app ID + installation ID
-- [ ] Provision Docker layer cache PVC (100 GB on agx-orin-prod-1)
-- [ ] Add `argocd-apps/ci-cd.yaml` ArgoCD Application
+- [x] Write ARC controller Helm app (`argocd-apps/arc-controller.yaml`, wave 5)
+- [x] Write ARC runner scale set Helm app (`argocd-apps/arc-runners.yaml`, wave 6) — ephemeral ARM64 runners, DinD sidecar, 0→5 scale, label: `arc-solomon`
+- [x] Provision Docker layer cache PVC (`infrastructure/ci-cd/arc/runners/build-runner/pvc.yaml`) — 100Gi on agx-orin-prod-1
+- [x] Update `argocd-apps/ci-cd.yaml` — directory app for PVC + secrets, wave 6
+- [ ] **RUNTIME**: Create GitHub App `solomon-arc` on stephenj-code org (see `infrastructure/ci-cd/arc/sealed-secrets/.gitkeep` for instructions)
+- [ ] **RUNTIME**: Seal arc-github-app → `infrastructure/ci-cd/arc/sealed-secrets/arc-github-app-sealed.yaml`
 
 ---
 
@@ -126,7 +126,7 @@ Solomon reads this file on session start to surface the current phase and open t
 - [ ] Write HTTPRoute for `frigate.project-solomon.ai` (`infrastructure/nvr/httproute.yaml`)
 - [ ] Write Keycloak client + oauth2-proxy for Frigate UI access
 - [ ] Add `argocd-apps/nvr.yaml` ArgoCD Application
-- [ ] Create frigate-agent repo from `solomon-app-template`
+- [ ] Create frigate-agent repo: `scripts/new-app.sh frigate-agent`
 - [ ] Implement frigate-agent LangGraph tools (events, snapshots, config, stats)
 - [ ] Test Muse Glimmer vision on Frigate snapshots (end-to-end agent query)
 
@@ -134,9 +134,11 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 11 — Agents
 
-- [ ] Create `solomon-app-template` GitHub template repo (`stephenj-code/solomon-app-template`)
-- [ ] Implement `provision.yaml` workflow (Cloudflare, Keycloak, LiteLLM, ArgoCD, LiteLLM agent registry)
-- [ ] Create `security-agent` repo from template
+- [ ] Write `templates/app-template/` — canonical app scaffold in this repo (see Phase 11 for full structure)
+- [ ] Write `scripts/new-app.sh` — creates GitHub repo from template, substitutes app name, pushes
+- [ ] Implement `templates/app-template/.github/workflows/provision.yaml` (Cloudflare, Keycloak, LiteLLM, ArgoCD, agent registry)
+- [ ] Add Trivy image scan + Bandit/Semgrep to `templates/app-template/.github/workflows/build.yaml`
+- [ ] Create security-agent repo: `scripts/new-app.sh security-agent`
 - [ ] Implement security-agent tools (Trivy CLI, VulnerabilityReport CRDs, Bandit, CVE lookup)
 
 ---
