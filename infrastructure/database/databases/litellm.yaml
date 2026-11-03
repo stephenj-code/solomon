@@ -1,0 +1,34 @@
+# CloudNativePG Database CR — litellm database in the shared cluster.
+#
+# Creates a `litellm` database and `litellm` user within the shared CNPG cluster.
+# After CNPG reconciles this CR, it creates a secret in the `database` namespace:
+#   Secret name: litellm-app  (contains username, password, uri, pgpass)
+#
+# LiteLLM runs in the `ai` namespace, so that secret is not directly accessible.
+# At Phase 13, extract the credentials and seal them into the `ai` namespace:
+#
+#   # Get the password CNPG generated
+#   PG_PASS=$(kubectl get secret litellm-app -n database \
+#     -o jsonpath='{.data.password}' | base64 -d)
+#
+#   # Seal a DATABASE_URL secret in the ai namespace
+#   kubectl create secret generic litellm-db \
+#     --namespace ai \
+#     --from-literal=DATABASE_URL="postgresql://litellm:${PG_PASS}@shared-rw.database.svc.cluster.local:5432/litellm" \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/ai/sealed-secrets/litellm-db-sealed.yaml
+#
+# Connection endpoints (from cluster.yaml):
+#   read-write: shared-rw.database.svc.cluster.local:5432
+#   read-only:  shared-r.database.svc.cluster.local:5432
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: litellm
+  namespace: database
+spec:
+  cluster:
+    name: shared
+  name: litellm
+  owner: litellm

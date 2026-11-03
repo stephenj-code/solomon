@@ -1,0 +1,130 @@
+# llama-server — Muse Glimmer 30B (llama.cpp)
+#
+# Runs the llama.cpp HTTP server with the Muse Glimmer 30B GGUF model.
+# Exposes an OpenAI-compatible /v1 API on port 8080.
+# LiteLLM routes the `fast` alias here.
+#
+# Model image: dustynv/llama_cpp:r36.4.0 — Jetson AI Lab build for JetPack 6.x.
+# Verify at https://jetson-ai-lab.com/models before Phase 13.
+#
+# Pinned to agx-orin-prod-1 — 61 GB RAM, GPU, 1 TB SSD.
+# agx-orin-prod-1 carries the control-plane taint; toleration required.
+#
+# Model is served from the llama-server-models PVC (populated by model-pull Job).
+# The initContainer waits for the sentinel file written by the Job before starting.
+#
+# Secrets required (sealed-secrets/):
+#   huggingface-token — not used here; consumed by model-pull Job.
+#   litellm-secrets   — not used here.
+#
+# Resource allocation:
+#   GPU: 1 (full AGX Orin GPU)
+#   RAM: request 8Gi, limit 40Gi (model ~16 GB VRAM + system overhead)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: llama-server
+  namespace: ai
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-server
+  namespace: ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llama-server
+  template:
+    metadata:
+      labels:
+        app: llama-server
+    spec:
+      serviceAccountName: llama-server
+      runtimeClassName: nvidia
+      nodeSelector:
+        kubernetes.io/hostname: agx-orin-prod-1
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: wait-for-model
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until [ -f /models/.model-ready ]; do
+                echo "Waiting for model-pull Job to complete..."
+                sleep 10
+              done
+              echo "Model ready."
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      containers:
+        - name: llama-server
+          image: dustynv/llama_cpp:r36.4.0
+          command:
+            - llama-server
+            - --model
+            - /models/muse-glimmer-30b.Q4_K_M.gguf
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --ctx-size
+            - "8192"
+            - --n-gpu-layers
+            - "999"
+            - --threads
+            - "8"
+            - --parallel
+            - "4"
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              memory: 8Gi
+              cpu: 2000m
+            limits:
+              memory: 40Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: llama-server-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llama-server
+  namespace: ai
+spec:
+  selector:
+    app: llama-server
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http

@@ -1,0 +1,30 @@
+# HTTPRoute — litellm.project-solomon.ai
+# Routes both HTTPS (LAN) and HTTP (cloudflared tunnel) listeners to LiteLLM.
+#
+# LiteLLM is an API service — no oauth2-proxy in front.
+# Auth enforced by Istio JWT RequestAuthentication at the IngressGateway
+# (see infrastructure/auth/istio/requestauthentication.yaml).
+# Clients pass a Keycloak-issued JWT as Bearer token.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: litellm
+  namespace: ai
+spec:
+  parentRefs:
+    - name: main
+      namespace: istio-system
+      sectionName: https
+    - name: main
+      namespace: istio-system
+      sectionName: http
+  hostnames:
+    - litellm.project-solomon.ai
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: litellm
+          port: 4000

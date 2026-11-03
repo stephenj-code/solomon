@@ -1,0 +1,65 @@
+# Explicit ALLOW rules for the ai namespace.
+# These counteract the deny-all AuthorizationPolicy in auth/istio/deny-by-default.yaml.
+#
+# Rule 1 — allow-litellm-ingress:
+#   IngressGateway → LiteLLM (port 4000). External API access after JWT validation.
+#
+# Rule 2 — allow-llama-server-internal:
+#   LiteLLM → llama-server (port 8080). Internal routing for `fast` alias.
+#   Source: SPIFFE cluster.local/ns/ai/sa/litellm
+#
+# Rule 3 — allow-vllm-internal:
+#   LiteLLM → vllm (port 8000). Internal routing for `smart` alias.
+#   Source: SPIFFE cluster.local/ns/ai/sa/litellm
+#
+# Phase 11 NOTE: per-agent allow rules will be added here as agents are provisioned.
+# Each agent's ServiceAccount principal must be listed explicitly.
+# Pattern: cluster.local/ns/<namespace>/sa/<agent-name>
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-litellm-ingress
+  namespace: ai
+spec:
+  selector:
+    matchLabels:
+      app: litellm
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-llama-server-internal
+  namespace: ai
+spec:
+  selector:
+    matchLabels:
+      app: llama-server
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/ai/sa/litellm
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-vllm-internal
+  namespace: ai
+spec:
+  selector:
+    matchLabels:
+      app: vllm
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/ai/sa/litellm

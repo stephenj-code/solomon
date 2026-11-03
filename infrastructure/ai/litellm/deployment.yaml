@@ -1,0 +1,134 @@
+# LiteLLM proxy — unified model gateway for all agents.
+#
+# Serves the `fast`, `smart`, `glm`, `kimi`, `external` model aliases.
+# All agents call LiteLLM; LiteLLM routes to the appropriate backend.
+# Virtual keys are issued per-agent during provisioning (solomon-app-template).
+#
+# Config mounted from litellm-config ConfigMap at /etc/litellm/config.yaml.
+# Port: 4000 (LiteLLM default).
+#
+# Database: CloudNativePG `litellm` database in the `database` namespace.
+#   Connection string injected via DATABASE_URL env var from litellm-db secret.
+#
+# Exposed externally at litellm.project-solomon.ai via HTTPRoute.
+# JWT auth enforced by Istio RequestAuthentication at the IngressGateway.
+#
+# Secrets required (sealed-secrets/):
+#   litellm-secrets — LITELLM_MASTER_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY
+#   litellm-db      — DATABASE_URL (postgres://litellm:<pw>@shared-rw.database:5432/litellm)
+#
+# Seal litellm-secrets:
+#   kubectl create secret generic litellm-secrets \
+#     --namespace ai \
+#     --from-literal=LITELLM_MASTER_KEY=<strong-key> \
+#     --from-literal=TOGETHER_API_KEY=<key> \
+#     --from-literal=FIREWORKS_API_KEY=<key> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/ai/sealed-secrets/litellm-secrets-sealed.yaml
+#
+# Seal litellm-db (after CNPG creates the database — see infrastructure/database/databases/litellm.yaml):
+#   kubectl create secret generic litellm-db \
+#     --namespace ai \
+#     --from-literal=DATABASE_URL="postgresql://litellm:<pw>@shared-rw.database.svc.cluster.local:5432/litellm" \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/ai/sealed-secrets/litellm-db-sealed.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litellm
+  namespace: ai
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      serviceAccountName: litellm
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-v1.57.2
+          command:
+            - litellm
+            - --config
+            - /etc/litellm/config.yaml
+            - --port
+            - "4000"
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secrets
+                  key: LITELLM_MASTER_KEY
+            - name: TOGETHER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secrets
+                  key: TOGETHER_API_KEY
+            - name: FIREWORKS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secrets
+                  key: FIREWORKS_API_KEY
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-db
+                  key: DATABASE_URL
+            - name: TZ
+              value: America/New_York
+          ports:
+            - containerPort: 4000
+              name: http
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/litellm
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 4000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: 4000
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 5
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: ai
+spec:
+  selector:
+    app: litellm
+  ports:
+    - port: 4000
+      targetPort: 4000
+      name: http

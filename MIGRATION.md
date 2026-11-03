@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 3 — Auth**
+**Current active phase: Phase 5 — AI stack**
 
 ---
 
@@ -57,15 +57,20 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 5 — AI stack
 
-- [ ] Write llama-server Deployment (`infrastructure/ai/llama-server/`) — Muse Glimmer 30B, pinned to agx-orin-prod-1
-- [ ] Write vllm Deployment (`infrastructure/ai/vllm/`) — Nemotron3 Nano 30B-A3B, pinned to agx-orin-prod-1
-- [ ] Write LiteLLM Deployment + config (`infrastructure/ai/litellm/`) — model aliases, virtual key config, agent registry
-- [ ] Seal HuggingFace token → `infrastructure/ai/sealed-secrets/`
-- [ ] Seal LiteLLM master key + Anthropic API key
-- [ ] Configure LiteLLM model aliases: `smart`, `fast`, `glm`, `kimi`, `external`
-- [ ] Register Together AI (GLM-5.2, GLM-5.3, Kimi K3) in LiteLLM config
-- [ ] Register Fireworks AI (Muse Glimmer cloud fallback) in LiteLLM config
-- [ ] Write model pull Job for Muse Glimmer (first-start artifact download)
+- [x] Write llama-server Deployment (`infrastructure/ai/llama-server/`) — Muse Glimmer 30B, pinned to agx-orin-prod-1
+- [x] Write vllm Deployment (`infrastructure/ai/vllm/`) — Nemotron3 Nano 30B-A3B, pinned to agx-orin-prod-1
+- [x] Write LiteLLM Deployment + config (`infrastructure/ai/litellm/`) — model aliases, virtual key config, agent registry
+- [x] Configure LiteLLM model aliases: `smart`, `fast`, `glm`, `kimi`, `external`
+- [x] Register Together AI (GLM-5.2 / GLM-5.3, Kimi K3) in LiteLLM config
+- [x] Register Fireworks AI (Muse Glimmer cloud fallback) in LiteLLM config
+- [x] Write model pull Job for Muse Glimmer (first-start artifact download)
+- [x] Write Istio allow rules for ai namespace (`infrastructure/ai/istio/allow-ai.yaml`)
+- [x] Write CloudNativePG Database CR for LiteLLM (`infrastructure/database/databases/litellm.yaml`)
+- [ ] **RUNTIME**: Confirm Muse Glimmer HF repo ID + GGUF filename (update model-pull/job.yaml placeholders)
+- [ ] **RUNTIME**: Seal huggingface-token → `infrastructure/ai/sealed-secrets/huggingface-token-sealed.yaml`
+- [ ] **RUNTIME**: Seal litellm-secrets (LITELLM_MASTER_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY) → `infrastructure/ai/sealed-secrets/litellm-secrets-sealed.yaml`
+- [ ] **RUNTIME**: Seal litellm-db (DATABASE_URL, after CNPG creates litellm database) → `infrastructure/ai/sealed-secrets/litellm-db-sealed.yaml`
+- [ ] **RUNTIME**: Verify Together AI + Fireworks model slugs in `infrastructure/ai/litellm/config.yaml`
 
 ---
 

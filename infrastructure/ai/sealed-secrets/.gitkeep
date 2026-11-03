@@ -1,0 +1,10 @@
+# Sealed secrets for the ai namespace.
+# Populated at Phase 13 (migration execution) — see sealing instructions in each deployment manifest.
+#
+# Required sealed secrets:
+#   huggingface-token-sealed.yaml  — HF_TOKEN (llama-server model-pull Job + vllm)
+#   litellm-secrets-sealed.yaml    — LITELLM_MASTER_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY
+#   litellm-db-sealed.yaml         — DATABASE_URL (after CNPG creates litellm database)
+#
+# All sealing instructions are in the relevant deployment.yaml headers.
+# Public key for offline sealing: scripts/sealed-secrets.pem

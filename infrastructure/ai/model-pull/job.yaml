@@ -1,0 +1,104 @@
+# Model pull Job — Muse Glimmer 30B GGUF first-start download.
+#
+# One-shot Job that downloads the Muse Glimmer 30B Q4_K_M GGUF from HuggingFace
+# into the llama-server-models PVC. Writes a sentinel file (/models/.model-ready)
+# on success so the llama-server initContainer knows it can proceed.
+#
+# Runs on agx-orin-prod-1 (same node as the PVC) — no GPU required.
+# Restarts on failure (backoffLimit: 4) so transient network errors self-heal.
+#
+# BEFORE PHASE 13 — set the correct HuggingFace model coordinates:
+#   HF_REPO_ID : HuggingFace repo (e.g. stephenj-code/muse-glimmer-30b-GGUF)
+#   HF_FILENAME: exact GGUF filename (e.g. muse-glimmer-30b.Q4_K_M.gguf)
+#
+# Verify the model is listed at https://jetson-ai-lab.com/models before Phase 13.
+# Only models from Jetson AI Lab are approved for deployment (see CLAUDE.md).
+#
+# Secrets required:
+#   huggingface-token — HF_TOKEN for private/gated repo access.
+#
+# Seal huggingface-token:
+#   kubectl create secret generic huggingface-token \
+#     --namespace ai \
+#     --from-literal=HF_TOKEN=hf_<your-token> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/ai/sealed-secrets/huggingface-token-sealed.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-pull-muse-glimmer
+  namespace: ai
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        kubernetes.io/hostname: agx-orin-prod-1
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: pull
+          image: python:3.11-slim
+          command:
+            - python3
+            - -c
+            - |
+              import os, subprocess, sys
+
+              model_path = f"/models/{os.environ['HF_FILENAME']}"
+              sentinel = "/models/.model-ready"
+
+              if os.path.exists(sentinel):
+                  print("Model already present, nothing to do.")
+                  sys.exit(0)
+
+              subprocess.run(
+                  ["pip", "install", "-q", "--no-cache-dir", "huggingface_hub"],
+                  check=True,
+              )
+
+              from huggingface_hub import hf_hub_download
+
+              print(f"Downloading {os.environ['HF_REPO_ID']}/{os.environ['HF_FILENAME']}...")
+              hf_hub_download(
+                  repo_id=os.environ["HF_REPO_ID"],
+                  filename=os.environ["HF_FILENAME"],
+                  local_dir="/models",
+                  token=os.environ.get("HF_TOKEN"),
+              )
+
+              with open(sentinel, "w") as f:
+                  f.write("ok\n")
+
+              print("Download complete.")
+          env:
+            - name: HF_REPO_ID
+              # Set to the actual HuggingFace repo ID before Phase 13.
+              # Example: stephenj-code/muse-glimmer-30b-GGUF
+              value: "PLACEHOLDER/muse-glimmer-30b-GGUF"
+            - name: HF_FILENAME
+              # Set to the actual GGUF filename before Phase 13.
+              value: "muse-glimmer-30b.Q4_K_M.gguf"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: huggingface-token
+                  key: HF_TOKEN
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 500m
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: llama-server-models

@@ -1,0 +1,18 @@
+# HuggingFace model cache for vllm.
+# local-path provisioner creates the volume on the node where the pod runs.
+# The Deployment is pinned to agx-orin-prod-1.
+#
+# Size: 80Gi — Nemotron3 Nano 30B-A3B is a MoE model; full HF weight download
+# is ~40–60 GB depending on precision. 80Gi provides headroom.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-model-cache
+  namespace: ai
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 80Gi

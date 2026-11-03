@@ -1,0 +1,19 @@
+# Model storage PVC for llama-server.
+# local-path provisioner creates the volume on whichever node the pod runs.
+# The Deployment is pinned to agx-orin-prod-1 (nodeSelector + hostname),
+# so this PVC will always land on that node's 1 TB SSD.
+#
+# Size: 50Gi — Muse Glimmer 30B Q4_K_M GGUF is ~16 GB; headroom for additional
+# quantisation variants.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llama-server-models
+  namespace: ai
+spec:
+  storageClassName: local-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
