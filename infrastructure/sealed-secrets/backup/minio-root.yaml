@@ -1,7 +1,11 @@
-# PLACEHOLDER — seal and replace this file before Phase 13 (migration execution).
+# PLACEHOLDER — seal before Phase 13 (migration execution).
 #
 # Creates: minio-root Secret in backup namespace
-# Keys:    MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
+# Keys:
+#   MINIO_ROOT_USER      — MinIO root username (e.g. "admin")
+#   MINIO_ROOT_PASSWORD  — strong MinIO root password
+#
+# Note: velero-minio.yaml must use the same credentials.
 #
 # Sealing command:
 #   kubectl create secret generic minio-root \
@@ -10,6 +14,6 @@
 #     --from-literal=MINIO_ROOT_PASSWORD=<strong-password> \
 #     --dry-run=client -o yaml | \
 #     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
-#     > infrastructure/backup/minio/sealed-secrets/minio-root-sealed.yaml
+#     > infrastructure/sealed-secrets/backup/minio-root.yaml
 #
 # Replace this entire file with the kubeseal output.

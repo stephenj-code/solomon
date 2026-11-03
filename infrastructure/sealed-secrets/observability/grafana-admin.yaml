@@ -1,0 +1,19 @@
+# PLACEHOLDER — seal before Phase 13 (migration execution).
+#
+# Creates: grafana-admin Secret in observability namespace
+# Keys:
+#   admin-user      — Grafana admin username (e.g. "admin")
+#   admin-password  — strong Grafana admin password
+#
+# Used by: kube-prometheus-stack Helm chart (grafana.admin.existingSecret)
+#
+# Sealing command:
+#   kubectl create secret generic grafana-admin \
+#     --namespace observability \
+#     --from-literal=admin-user=admin \
+#     --from-literal=admin-password=<strong-password> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/observability/grafana-admin.yaml
+#
+# Replace this entire file with the kubeseal output.

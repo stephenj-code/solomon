@@ -1,0 +1,21 @@
+# PLACEHOLDER — seal before Phase 13 (migration execution).
+#
+# Creates: cloudflare-tunnel-token Secret in networking namespace
+# Key:     token — Cloudflare Tunnel token (from Zero Trust dashboard)
+#
+# Used by: cloudflared Deployment (TUNNEL_TOKEN env var)
+#          Authenticates the tunnel that routes external traffic into the cluster
+#
+# Obtain from Cloudflare Zero Trust dashboard:
+#   Networks → Tunnels → Create a tunnel → Cloudflared → Copy the token
+#   Tunnel name: solomon-ingress
+#
+# Sealing command:
+#   kubectl create secret generic cloudflare-tunnel-token \
+#     --namespace networking \
+#     --from-literal=token=<tunnel-token> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/networking/cloudflare-tunnel-token.yaml
+#
+# Replace this entire file with the kubeseal output.

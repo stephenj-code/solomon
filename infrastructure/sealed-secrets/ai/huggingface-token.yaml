@@ -1,0 +1,17 @@
+# PLACEHOLDER — seal before Phase 13 (migration execution).
+#
+# Creates: huggingface-token Secret in ai namespace
+# Keys:    HF_TOKEN — HuggingFace API token for model downloads
+#
+# Used by: llama-server initContainer (model-pull job), vllm deployment
+# Obtain:  https://huggingface.co/settings/tokens → New token (read scope)
+#
+# Sealing command:
+#   kubectl create secret generic huggingface-token \
+#     --namespace ai \
+#     --from-literal=HF_TOKEN=hf_<your-token> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/ai/huggingface-token.yaml
+#
+# Replace this entire file with the kubeseal output.

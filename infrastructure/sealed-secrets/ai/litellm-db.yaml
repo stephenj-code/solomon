@@ -1,0 +1,19 @@
+# PLACEHOLDER — seal after Phase 13 step: CloudNativePG creates the litellm database.
+#
+# Creates: litellm-db Secret in ai namespace
+# Keys:    DATABASE_URL — PostgreSQL connection string for LiteLLM
+#
+# Dependencies:
+#   1. CloudNativePG shared cluster must be running (phase 4)
+#   2. litellm Database CR applied → CNPG auto-creates `litellm-app` secret in database namespace
+#   3. Extract the password: kubectl get secret litellm-app -n database -o jsonpath='{.data.password}' | base64 -d
+#
+# Sealing command:
+#   kubectl create secret generic litellm-db \
+#     --namespace ai \
+#     --from-literal=DATABASE_URL="postgresql://litellm:<password>@shared-rw.database.svc.cluster.local:5432/litellm" \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/ai/litellm-db.yaml
+#
+# Replace this entire file with the kubeseal output.

@@ -1,0 +1,22 @@
+# PLACEHOLDER — seal before Phase 13 (migration execution).
+#
+# Creates: cloudflare-api-token Secret in cert-manager namespace
+# Key:     api-token — Cloudflare API token for DNS-01 ACME challenge
+#
+# Used by: cert-manager ClusterIssuer (letsencrypt-prod) to issue wildcard TLS cert
+#          for *.project-solomon.ai via Cloudflare DNS-01 challenge
+#
+# Obtain from Cloudflare dashboard:
+#   My Profile → API Tokens → Create Token
+#   Template: Edit zone DNS
+#   Zone Resources: Include → Specific zone → project-solomon.ai
+#
+# Sealing command:
+#   kubectl create secret generic cloudflare-api-token \
+#     --namespace cert-manager \
+#     --from-literal=api-token=<cloudflare-api-token> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/cert-manager/cloudflare-api-token.yaml
+#
+# Replace this entire file with the kubeseal output.

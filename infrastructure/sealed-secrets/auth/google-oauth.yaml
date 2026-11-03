@@ -1,0 +1,26 @@
+# PLACEHOLDER — seal before Phase 13 (migration execution).
+#
+# Creates: google-oauth Secret in auth namespace
+# Keys:
+#   GOOGLE_CLIENT_ID      — Google OAuth2 client ID
+#   GOOGLE_CLIENT_SECRET  — Google OAuth2 client secret
+#
+# Used by: Keycloak social Identity Provider (Google IdP federation)
+#          Enables "Sign in with Google" via Keycloak → token issued by Keycloak
+#
+# Obtain from Google Cloud Console:
+#   1. APIs & Services → Credentials → Create OAuth 2.0 Client ID
+#   2. Application type: Web application
+#   3. Authorized redirect URI: https://auth.project-solomon.ai/realms/solomon/broker/google/endpoint
+#   4. Copy Client ID and Client Secret
+#
+# Sealing command:
+#   kubectl create secret generic google-oauth \
+#     --namespace auth \
+#     --from-literal=GOOGLE_CLIENT_ID=<client-id>.apps.googleusercontent.com \
+#     --from-literal=GOOGLE_CLIENT_SECRET=<client-secret> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/auth/google-oauth.yaml
+#
+# Replace this entire file with the kubeseal output.

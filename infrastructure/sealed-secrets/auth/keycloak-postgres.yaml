@@ -1,7 +1,10 @@
-# PLACEHOLDER — seal and replace this file before Phase 13 (migration execution).
+# PLACEHOLDER — seal before Phase 13 (migration execution).
 #
 # Creates: keycloak-postgres Secret in auth namespace
-# Keys:    POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+# Keys:
+#   POSTGRES_DB        — database name (value: keycloak)
+#   POSTGRES_USER      — database username (value: keycloak)
+#   POSTGRES_PASSWORD  — strong database password
 #
 # Sealing command:
 #   kubectl create secret generic keycloak-postgres \
@@ -11,6 +14,6 @@
 #     --from-literal=POSTGRES_PASSWORD=<strong-password> \
 #     --dry-run=client -o yaml | \
 #     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
-#     > infrastructure/auth/keycloak/sealed-secrets/keycloak-postgres-sealed.yaml
+#     > infrastructure/sealed-secrets/auth/keycloak-postgres.yaml
 #
 # Replace this entire file with the kubeseal output.

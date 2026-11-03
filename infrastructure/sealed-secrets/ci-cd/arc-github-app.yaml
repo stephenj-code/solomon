@@ -1,0 +1,32 @@
+# PLACEHOLDER — seal before Phase 13 (migration execution).
+#
+# Creates: arc-github-app Secret in arc-systems namespace
+# Keys:
+#   github_app_id              — numeric GitHub App ID
+#   github_app_installation_id — numeric installation ID for the stephenj-code org
+#   github_app_private_key     — PEM private key (base64-encoded in the secret)
+#
+# Used by: ARC (Actions Runner Controller) gha-runner-scale-set-controller
+#          Authenticates the controller to GitHub to manage runner registration
+#
+# Setup steps:
+#   1. github.com → Settings → Developer settings → GitHub Apps → New GitHub App
+#   2. Name: solomon-arc, Homepage URL: https://github.com/stephenj-code
+#   3. Permissions: Repository: Actions (read), Administration (read+write)
+#                  Organization: Self-hosted runners (read+write)
+#   4. Install the App on the stephenj-code organization
+#   5. Generate and download a private key (.pem file)
+#   6. Note the App ID (shown on app settings page)
+#   7. Note the Installation ID (URL when viewing the installation: .../installations/<id>)
+#
+# Sealing command:
+#   kubectl create secret generic arc-github-app \
+#     --namespace arc-systems \
+#     --from-literal=github_app_id=<app-id> \
+#     --from-literal=github_app_installation_id=<installation-id> \
+#     --from-file=github_app_private_key=<path-to-pem-file> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/sealed-secrets/ci-cd/arc-github-app.yaml
+#
+# Replace this entire file with the kubeseal output.
