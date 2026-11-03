@@ -2,24 +2,21 @@
 # Mounted read-only at /etc/litellm/config.yaml in the litellm container.
 #
 # Model aliases exposed to all consumers:
-#   fast     — Muse Glimmer 30B via llama-server (llama.cpp, highest throughput)
-#   smart    — Nemotron3 Nano 30B-A3B via vllm (stronger reasoning, MoE)
-#   glm      — Together AI GLM (GLM-5.2 / GLM-5.3)
-#   kimi     — Together AI Kimi K3
-#   external — Fireworks AI Muse Glimmer cloud fallback
+#   fast   — Muse Glimmer 30B via llama-server (llama.cpp, highest throughput)
+#   smart  — Nemotron3 Nano 30B-A3B via vllm (stronger reasoning, MoE)
+#   glm    — Together AI GLM (GLM-5.2 / GLM-5.3)
+#   kimi   — Together AI Kimi K3
 #
 # Secrets injected at runtime via env vars (see sealed-secrets/):
 #   LITELLM_MASTER_KEY   — master API key for admin operations
-#   TOGETHER_API_KEY     — Together AI
-#   FIREWORKS_API_KEY    — Fireworks AI
+#   TOGETHER_API_KEY     — Together AI (glm + kimi aliases)
 #   DATABASE_URL         — PostgreSQL for spend tracking and virtual keys
 #
 # Agent registry: all agents are registered as LiteLLM virtual keys during
 # provisioning (solomon-app-template workflow). This config only manages models.
 #
-# VERIFY model IDs before Phase 13:
-#   Together AI: https://api.together.ai/models
-#   Fireworks AI: https://fireworks.ai/models
+# VERIFY Together AI model IDs before Phase 13:
+#   https://api.together.ai/models
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -58,15 +55,6 @@ data:
           # Kimi K3 — verify exact model slug on Together AI
           model: together_ai/moonshotai/Kimi-K1.5-32K
           api_key: os.environ/TOGETHER_API_KEY
-
-      # ── Cloud fallback ─────────────────────────────────────────────────────────
-      # Fireworks AI hosts Muse Glimmer for when the local instance is unavailable.
-      # Verify model slug at https://fireworks.ai/models before Phase 13.
-
-      - model_name: external
-        litellm_params:
-          model: fireworks_ai/accounts/fireworks/models/muse-glimmer-30b
-          api_key: os.environ/FIREWORKS_API_KEY
 
     litellm_settings:
       master_key: os.environ/LITELLM_MASTER_KEY

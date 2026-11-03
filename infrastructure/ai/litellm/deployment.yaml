@@ -14,7 +14,7 @@
 # JWT auth enforced by Istio RequestAuthentication at the IngressGateway.
 #
 # Secrets required (sealed-secrets/):
-#   litellm-secrets — LITELLM_MASTER_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY
+#   litellm-secrets — LITELLM_MASTER_KEY, TOGETHER_API_KEY
 #   litellm-db      — DATABASE_URL (postgres://litellm:<pw>@shared-rw.database:5432/litellm)
 #
 # Seal litellm-secrets:
@@ -22,7 +22,6 @@
 #     --namespace ai \
 #     --from-literal=LITELLM_MASTER_KEY=<strong-key> \
 #     --from-literal=TOGETHER_API_KEY=<key> \
-#     --from-literal=FIREWORKS_API_KEY=<key> \
 #     --dry-run=client -o yaml | \
 #     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
 #     > infrastructure/ai/sealed-secrets/litellm-secrets-sealed.yaml
@@ -76,11 +75,6 @@ spec:
                 secretKeyRef:
                   name: litellm-secrets
                   key: TOGETHER_API_KEY
-            - name: FIREWORKS_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: litellm-secrets
-                  key: FIREWORKS_API_KEY
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

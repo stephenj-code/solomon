@@ -62,15 +62,15 @@ Solomon reads this file on session start to surface the current phase and open t
 - [x] Write LiteLLM Deployment + config (`infrastructure/ai/litellm/`) — model aliases, virtual key config, agent registry
 - [x] Configure LiteLLM model aliases: `smart`, `fast`, `glm`, `kimi`, `external`
 - [x] Register Together AI (GLM-5.2 / GLM-5.3, Kimi K3) in LiteLLM config
-- [x] Register Fireworks AI (Muse Glimmer cloud fallback) in LiteLLM config
+- ~~Register Fireworks AI (Muse Glimmer cloud fallback) in LiteLLM config~~ — removed, not needed
 - [x] Write model pull Job for Muse Glimmer (first-start artifact download)
 - [x] Write Istio allow rules for ai namespace (`infrastructure/ai/istio/allow-ai.yaml`)
 - [x] Write CloudNativePG Database CR for LiteLLM (`infrastructure/database/databases/litellm.yaml`)
 - [ ] **RUNTIME**: Confirm Muse Glimmer HF repo ID + GGUF filename (update model-pull/job.yaml placeholders)
 - [ ] **RUNTIME**: Seal huggingface-token → `infrastructure/ai/sealed-secrets/huggingface-token-sealed.yaml`
-- [ ] **RUNTIME**: Seal litellm-secrets (LITELLM_MASTER_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY) → `infrastructure/ai/sealed-secrets/litellm-secrets-sealed.yaml`
+- [ ] **RUNTIME**: Seal litellm-secrets (LITELLM_MASTER_KEY, TOGETHER_API_KEY) → `infrastructure/ai/sealed-secrets/litellm-secrets-sealed.yaml`
 - [ ] **RUNTIME**: Seal litellm-db (DATABASE_URL, after CNPG creates litellm database) → `infrastructure/ai/sealed-secrets/litellm-db-sealed.yaml`
-- [ ] **RUNTIME**: Verify Together AI + Fireworks model slugs in `infrastructure/ai/litellm/config.yaml`
+- [ ] **RUNTIME**: Verify Together AI model slugs (glm, kimi) in `infrastructure/ai/litellm/config.yaml`
 
 ---
 
