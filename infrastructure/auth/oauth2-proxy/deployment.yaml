@@ -1,0 +1,142 @@
+# oauth2-proxy — shared OIDC session manager for browser-based UI access.
+# Sits in front of UI services; handles Keycloak redirect flow and sets
+# session cookies. API callers skip oauth2-proxy and pass JWT directly.
+#
+# This deployment handles the shared /oauth2/ callback endpoint. Per-service
+# oauth2-proxy instances are created by the solomon-app-template provisioning
+# workflow when a new UI app is onboarded.
+#
+# Requires: Keycloak realm "solomon" with an oauth2-proxy OIDC client.
+# Create the client in Keycloak admin console:
+#   Client ID:    oauth2-proxy
+#   Client type:  OpenID Connect (confidential)
+#   Redirect URI: https://*.project-solomon.ai/oauth2/callback
+#   Scopes:       openid, profile, email
+#
+# Secrets required before Phase 13 (see sealed-secrets/ subdirectory):
+#   oauth2-proxy-secrets — OAUTH2_PROXY_CLIENT_SECRET, OAUTH2_PROXY_COOKIE_SECRET
+#
+# Generate cookie secret (32 bytes, base64-encoded):
+#   python3 -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())'
+#
+# Seal oauth2-proxy-secrets:
+#   kubectl create secret generic oauth2-proxy-secrets \
+#     --namespace auth \
+#     --from-literal=OAUTH2_PROXY_CLIENT_SECRET=<keycloak-client-secret> \
+#     --from-literal=OAUTH2_PROXY_COOKIE_SECRET=<generated-cookie-secret> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/auth/oauth2-proxy/sealed-secrets/oauth2-proxy-secrets-sealed.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oauth2-proxy
+  namespace: auth
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      serviceAccountName: oauth2-proxy
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url=https://keycloak.project-solomon.ai/realms/solomon
+            - --client-id=oauth2-proxy
+            - --redirect-url=https://oauth2.project-solomon.ai/oauth2/callback
+            - --email-domain=*
+            - --cookie-domain=.project-solomon.ai
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            # Pass the JWT in the Authorization header so Istio can validate it.
+            - --set-authorization-header=true
+            - --pass-authorization-header=true
+            # Return upstream headers for downstream services.
+            - --set-xauthrequest=true
+            # Skip authentication for health endpoint.
+            - --skip-auth-route=^/ping$
+            # static upstream: oauth2-proxy validates auth only; HTTPRoute handles routing.
+            - --upstream=static://202
+            - --http-address=0.0.0.0:4180
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-proxy-secrets
+                  key: OAUTH2_PROXY_CLIENT_SECRET
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-proxy-secrets
+                  key: OAUTH2_PROXY_COOKIE_SECRET
+          ports:
+            - containerPort: 4180
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+  namespace: auth
+spec:
+  selector:
+    app: oauth2-proxy
+  ports:
+    - port: 4180
+      targetPort: 4180
+---
+# HTTPRoute for the shared oauth2 callback endpoint.
+# Individual UI service HTTPRoutes forward /oauth2/* paths to this service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: oauth2-proxy
+  namespace: auth
+spec:
+  parentRefs:
+    - name: main
+      namespace: istio-system
+      sectionName: https
+    - name: main
+      namespace: istio-system
+      sectionName: http
+  hostnames:
+    - oauth2.project-solomon.ai
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - name: oauth2-proxy
+          port: 4180

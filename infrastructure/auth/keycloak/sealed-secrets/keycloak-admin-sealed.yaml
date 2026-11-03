@@ -1,0 +1,15 @@
+# PLACEHOLDER — seal and replace this file before Phase 13 (migration execution).
+#
+# Creates: keycloak-admin Secret in auth namespace
+# Keys:    KEYCLOAK_ADMIN (admin username), KEYCLOAK_ADMIN_PASSWORD (strong password)
+#
+# Sealing command:
+#   kubectl create secret generic keycloak-admin \
+#     --namespace auth \
+#     --from-literal=KEYCLOAK_ADMIN=admin \
+#     --from-literal=KEYCLOAK_ADMIN_PASSWORD=<strong-password> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/auth/keycloak/sealed-secrets/keycloak-admin-sealed.yaml
+#
+# Replace this entire file with the kubeseal output.

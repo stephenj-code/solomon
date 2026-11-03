@@ -1,0 +1,133 @@
+# Keycloak 26.0.7 — OIDC/OAuth2 identity provider for project-solomon.
+# All external-facing services authenticate via this Keycloak instance.
+# Realm: solomon — configure via admin console or import realm export.
+#
+# Runs in production mode (no --dev flag). TLS terminated at the Istio
+# IngressGateway; Keycloak receives plain HTTP from the proxy.
+#
+# Depends on: keycloak-postgres StatefulSet in this namespace.
+#
+# Secrets required before Phase 13 (see sealed-secrets/ subdirectory):
+#   keycloak-admin    — KEYCLOAK_ADMIN, KEYCLOAK_ADMIN_PASSWORD
+#   keycloak-postgres — POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+#
+# Seal keycloak-admin:
+#   kubectl create secret generic keycloak-admin \
+#     --namespace auth \
+#     --from-literal=KEYCLOAK_ADMIN=admin \
+#     --from-literal=KEYCLOAK_ADMIN_PASSWORD=<strong-password> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/auth/keycloak/sealed-secrets/keycloak-admin-sealed.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keycloak
+  namespace: auth
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      serviceAccountName: keycloak
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z keycloak-postgres 5432; do
+                echo "waiting for postgres..."; sleep 2
+              done
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0.7
+          args: [start]
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://keycloak-postgres:5432/$(KC_DB_NAME)
+            - name: KC_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres
+                  key: POSTGRES_DB
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres
+                  key: POSTGRES_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres
+                  key: POSTGRES_PASSWORD
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            # Istio IngressGateway terminates TLS; Keycloak receives HTTP.
+            # KC_PROXY_HEADERS=xforwarded trusts X-Forwarded-* headers from the proxy.
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HOSTNAME
+              value: keycloak.project-solomon.ai
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: TZ
+              value: America/New_York
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: auth
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080

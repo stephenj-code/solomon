@@ -1,0 +1,30 @@
+# Deny-by-default AuthorizationPolicies for sensitive namespaces.
+# An AuthorizationPolicy with empty spec denies ALL traffic to pods in the namespace.
+# Explicit ALLOW rules (allow-*.yaml) must be added for each consumer.
+#
+# Applied to: ai, auth, mcp-servers
+# NOT applied to: observability, database, backup — those use NetworkPolicy only.
+#
+# CLAUDE.md: "Deny-by-default AuthorizationPolicy is active on ai, auth, mcp-servers
+# — explicit allow rules required for new in-cluster consumers."
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: ai
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: auth
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: mcp-servers
+spec: {}

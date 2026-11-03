@@ -1,0 +1,98 @@
+# PostgreSQL — dedicated instance backing Keycloak.
+# Runs as a single-replica StatefulSet in the auth namespace.
+# Data persisted via local-path PVC on agx-orin-prod-1.
+#
+# Credentials stored as SealedSecret. Seal before Phase 13:
+#   kubectl create secret generic keycloak-postgres \
+#     --namespace auth \
+#     --from-literal=POSTGRES_DB=keycloak \
+#     --from-literal=POSTGRES_USER=keycloak \
+#     --from-literal=POSTGRES_PASSWORD=<strong-password> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/auth/keycloak/sealed-secrets/keycloak-postgres-sealed.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: keycloak-postgres
+  namespace: auth
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: keycloak-postgres
+  namespace: auth
+spec:
+  serviceName: keycloak-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak-postgres
+  template:
+    metadata:
+      labels:
+        app: keycloak-postgres
+    spec:
+      serviceAccountName: keycloak-postgres
+      containers:
+        - name: postgres
+          image: postgres:16.3
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: TZ
+              value: America/New_York
+            - name: PGTZ
+              value: America/New_York
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, keycloak]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-postgres
+  namespace: auth
+spec:
+  selector:
+    app: keycloak-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

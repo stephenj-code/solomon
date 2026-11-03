@@ -33,12 +33,14 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 3 — Auth
 
-- [ ] Write Keycloak manifests (`infrastructure/auth/keycloak/`) — Deployment, Service, HTTPRoute, PVC
-- [ ] Write oauth2-proxy manifests (`infrastructure/auth/oauth2-proxy/`)
-- [ ] Write Istio JWT AuthPolicy (cluster-wide, validates Keycloak JWKS)
-- [ ] Write deny-by-default AuthorizationPolicy for `ai`, `auth`, `mcp-servers` namespaces
+- [x] Write Keycloak manifests (`infrastructure/auth/keycloak/`) — Deployment, Service, HTTPRoute, PVC
+- [x] Write oauth2-proxy manifests (`infrastructure/auth/oauth2-proxy/`)
+- [x] Write Istio JWT AuthPolicy (cluster-wide, validates Keycloak JWKS)
+- [x] Write deny-by-default AuthorizationPolicy for `ai`, `auth`, `mcp-servers` namespaces
 - [ ] Import Keycloak realm export (run after Keycloak is up)
-- [ ] Seal Keycloak admin password → `infrastructure/auth/keycloak/sealed-secrets/`
+- [ ] **RUNTIME**: Seal keycloak-admin → `infrastructure/auth/keycloak/sealed-secrets/keycloak-admin-sealed.yaml`
+- [ ] **RUNTIME**: Seal keycloak-postgres → `infrastructure/auth/keycloak/sealed-secrets/keycloak-postgres-sealed.yaml`
+- [ ] **RUNTIME**: Seal oauth2-proxy-secrets → `infrastructure/auth/oauth2-proxy/sealed-secrets/oauth2-proxy-secrets-sealed.yaml`
 
 ---
 

@@ -1,0 +1,30 @@
+# JWT RequestAuthentication — cluster-wide JWT validation at the IngressGateway.
+# Applied to the main Gateway in istio-system so every inbound request carrying
+# a Bearer token has it validated against Keycloak's JWKS before reaching services.
+#
+# Requests without a JWT are still admitted (401 enforcement is left to per-namespace
+# AuthorizationPolicy rules so unauthenticated browser requests can reach oauth2-proxy
+# for the SSO redirect flow).
+#
+# Issuer: https://keycloak.project-solomon.ai/realms/solomon
+# JWKS:   https://keycloak.project-solomon.ai/realms/solomon/protocol/openid-connect/certs
+#
+# After Keycloak is up, verify JWKS is reachable:
+#   curl https://keycloak.project-solomon.ai/realms/solomon/protocol/openid-connect/certs
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: jwt-keycloak
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: main
+  jwtRules:
+    - issuer: "https://keycloak.project-solomon.ai/realms/solomon"
+      jwksUri: "https://keycloak.project-solomon.ai/realms/solomon/protocol/openid-connect/certs"
+      # Forward the validated JWT to upstream services so they can inspect claims.
+      forwardOriginalToken: true
+      # Cache JWKS for 5 minutes to reduce load on Keycloak.
+      jwksFetchDelay: 5m

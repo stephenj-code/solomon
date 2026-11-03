@@ -1,0 +1,62 @@
+# Explicit ALLOW rules for the auth namespace.
+# These counteract the deny-all policy for traffic that must flow.
+#
+# Rule 1 — allow-keycloak-ingress:
+#   Istio IngressGateway → Keycloak (HTTP on :8080).
+#   SPIFFE: cluster.local/ns/istio-system/sa/istio-ingressgateway
+#
+# Rule 2 — allow-oauth2-proxy-ingress:
+#   Istio IngressGateway → oauth2-proxy (HTTP on :4180).
+#   Same principal — ingressgateway handles the /oauth2/* routes.
+#
+# Rule 3 — allow-keycloak-internal:
+#   oauth2-proxy → Keycloak for token exchange (within auth namespace).
+#   SPIFFE: cluster.local/ns/auth/sa/oauth2-proxy
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-keycloak-ingress
+  namespace: auth
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-oauth2-proxy-ingress
+  namespace: auth
+spec:
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-keycloak-internal
+  namespace: auth
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/auth/sa/oauth2-proxy
