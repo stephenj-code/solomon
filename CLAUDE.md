@@ -302,6 +302,70 @@ git-cliff v0.1..v0.2 --output CHANGELOG.md
 git add CHANGELOG.md && git commit -m "docs: changelog for v0.2"
 ```
 
+### Solomon's branch naming decision (platform repo)
+
+Before writing any code, Solomon picks a branch using this logic:
+
+**Pre-launch (currently on v0.1):**
+- Default: commit directly to `v0.1`
+- Only create `feat/<name>` from `v0.1` if the sub-task is large enough to need isolation
+  (e.g. rewriting the entire Istio stack while other work is ongoing)
+
+**Post-launch (live cluster, working on main):**
+
+| Change type | Branch |
+|-------------|--------|
+| Config tweak, image bump, docs update, adding a namespace, minor YAML fix | Direct to `main` |
+| New operator, CNI upgrade, Istio upgrade, auth model change, anything that could break the cluster | `feat/<descriptive-name>` |
+| Hotfix on a live breakage that's too complex for a one-liner | `fix/<descriptive-name>` |
+
+Branch naming rules:
+- Lowercase, hyphenated, describes the change — not the commit type
+- Good: `feat/istio-v1.24-upgrade`, `feat/add-mcp-external-ns`, `fix/oauth2-proxy-redirect-loop`
+- Bad: `feat/feature`, `fix/bug`, `update-stuff`
+
+**When uncertain:** if the change touches networking, auth, or storage in a way that could make pods unreachable or data inaccessible, use a feature branch. Config changes within a stable system go direct to `main`.
+
+### Tag mechanics and cluster rollback
+
+**What a tag captures:** the exact state of every file in the repo at that commit — all manifests, image SHA tags in `deployment.yaml` files, sealed secrets. ArgoCD can be pointed at any tag to reproduce that cluster state exactly.
+
+**Tags do NOT capture data state.** Postgres contents, MinIO objects, Loki logs — these are outside git. For complete point-in-time recovery, a Velero backup must exist alongside each tag.
+
+**Convention:** take a manual Velero snapshot before tagging a milestone:
+```bash
+velero backup create pre-v0-2 --wait   # capture data state
+git tag v0.2 && git push origin --tags  # capture manifest state
+```
+
+**Rollback approaches:**
+
+*Manifests only (stateless apps, config mistakes):*
+```bash
+# Revert a bad commit cleanly
+git revert <sha>              # creates new commit — safe, ArgoCD sees it
+git push origin main          # ArgoCD syncs, cluster converges to reverted state
+```
+
+*Roll cluster to a specific tag (e.g. go back to v0.1):*
+```bash
+# Option A — git revert range (keeps linear history)
+git revert v0.1..HEAD         # generates revert commits for all changes since v0.1
+git push origin main
+
+# Option B — ArgoCD targetRevision (zero git history change)
+# Edit argocd-apps/_root.yaml: set targetRevision: v0.1 on the root app
+# ArgoCD resyncs all child apps from that tag's manifests
+# To return: set targetRevision back to HEAD
+```
+
+*Full point-in-time recovery (data + manifests):*
+1. `velero restore create --from-backup pre-v0-2` — restores PVCs, ConfigMaps, Secrets (requires Steve approval, destructive)
+2. Roll manifests to `v0.2` via Option A or B above
+3. Verify cluster health before re-tagging
+
+**Key limitation:** git revert restores manifest state but ArgoCD syncs happen incrementally. If a CRD was deleted between tags, Velero restore may be needed to get it back cleanly.
+
 ### App repos (per service/agent/api)
 
 ```
