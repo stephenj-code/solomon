@@ -29,9 +29,22 @@ nodeinit:
 
 # ARM64 / Jetson: no special config needed — Cilium ships multi-arch images
 
-# Hubble (observability) — disabled for now, enable when observability stack is up
+# Hubble (observability) — real-time L3/L4 network flow visibility
+# relay: required for UI and external consumers (Grafana, CLI)
+# ui: web dashboard for browsing flows and policy verdicts
+# metrics: exposes per-flow Prometheus metrics (drop counts, policy verdicts, DNS)
 hubble:
+  enabled: true
   relay:
-    enabled: false
+    enabled: true
   ui:
-    enabled: false
+    enabled: true
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - httpV2
