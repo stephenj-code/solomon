@@ -6,8 +6,11 @@ metadata:
 spec:
   parentRefs:
     - name: main
-      namespace: networking
+      namespace: istio-system
       sectionName: https
+    - name: main
+      namespace: istio-system
+      sectionName: http
   hostnames:
     - __APP_NAME__.project-solomon.ai
   rules:

@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 10 — NVR (Frigate)**
+**Current active phase: Phase 11 — Agents**
 
 ---
 
@@ -92,8 +92,8 @@ Solomon reads this file on session start to surface the current phase and open t
 - [x] Write Pod Security Standards admission config — PSA labels on all namespaces in `infrastructure/namespaces/namespaces.yaml`; `restricted` on `auth`, `baseline` everywhere else (`ai` kept at baseline — GPU workloads incompatible with restricted)
 - [x] Configure etcd encryption at rest — `scripts/enable-etcd-encryption.sh`; run on agx-orin-prod-1 during Phase 13 after cluster is healthy; save generated AES key to KeePass
 - [x] Update `argocd-apps/security.yaml` — wave 7, updated comment
-- [ ] Add Trivy image scan step to `templates/app-template/.github/workflows/` (Phase 11)
-- [ ] Add Bandit + Semgrep SAST step to `templates/app-template/.github/workflows/` (Phase 11)
+- [x] Add Trivy image scan step to `templates/app-template/.github/workflows/` (Phase 11)
+- [x] Add Bandit + Semgrep SAST step to `templates/app-template/.github/workflows/` (Phase 11)
 - [ ] **EXTERNAL**: Set up Renovate Bot on GitHub org (`stephenj-code`) — configure via `renovate.json` in each app repo or org-level config
 
 ---
@@ -138,10 +138,10 @@ Solomon reads this file on session start to surface the current phase and open t
 
 - [x] Write `templates/app-template/` — canonical app scaffold in this repo (see Phase 11 for full structure)
 - [x] Write `scripts/new-app.sh` — creates GitHub repo from template, substitutes app name, pushes
-- [ ] Implement `templates/app-template/.github/workflows/provision.yaml` (Cloudflare, Keycloak, LiteLLM, ArgoCD, agent registry)
-- [ ] Add Trivy image scan + Bandit/Semgrep to `templates/app-template/.github/workflows/build.yaml`
-- [ ] Create security-agent repo: `scripts/new-app.sh security-agent`
-- [ ] Implement security-agent tools (Trivy CLI, VulnerabilityReport CRDs, Bandit, CVE lookup)
+- [x] Implement `templates/app-template/.github/workflows/provision.yaml` (Cloudflare, Keycloak, LiteLLM, ArgoCD, database, UI oauth2-proxy)
+- [x] Add Trivy image scan + Bandit/Semgrep to `templates/app-template/.github/workflows/build.yaml`
+- [ ] **RUNTIME**: Create security-agent repo: `scripts/new-app.sh security-agent`
+- [ ] **RUNTIME**: Implement security-agent tools in created repo (Trivy CLI, VulnerabilityReport CRDs, Bandit, CVE lookup)
 
 ---
 
