@@ -55,6 +55,8 @@ commit_parsers = [
 # Only include these groups in the output (others skipped)
 # Remove groups you don't want in the changelog
 commit_preprocessors = [
-  # strip trailing whitespace
   { pattern = '\s+$', replace = "" },
+  # skip bot-generated churn (image tag patches, sealed-secret commits)
+  { pattern = "chore: update image to [a-f0-9]{7}", replace = "" },
+  { pattern = "chore: seal secrets and mark provisioned", replace = "" },
 ]

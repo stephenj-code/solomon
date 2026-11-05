@@ -100,6 +100,24 @@ Ingress: none (this IS the ingress layer). Auth: n/a.
 
 ---
 
+### `argocd`
+
+ArgoCD: `argocd-apps/gitops.yaml` → `infrastructure/gitops/argocd/` wave:6.
+ArgoCD server, repo-server, application-set controller, dex, redis, notifications controller.
+Ingress: `argocd.project-solomon.ai` → HTTPRoute → Service `argocd-server:80`.
+Auth: ArgoCD's own OIDC integration with Keycloak (`argocd-cm` configures OIDC). No deny-all on argocd namespace.
+
+---
+
+### Sealed Secrets storage — `infrastructure/sealed-secrets/`
+
+Not a namespace. Cross-cutting directory of committed SealedSecret manifests organised by target namespace:
+`ai/`, `auth/`, `backup/`, `cert-manager/`, `ci-cd/`, `networking/`, `observability/`.
+ArgoCD apps for each namespace pick these up via `directory.recurse: true`.
+Never contains raw `Secret` objects — always `SealedSecret` kind.
+
+---
+
 ### `networking`
 
 ArgoCD: `argocd-apps/networking.yaml` → `infrastructure/networking/` wave:4.
@@ -206,6 +224,26 @@ Ingress: none. Auth: Cilium NetworkPolicy only.
 ArgoCD: `argocd-apps/arc-controller.yaml` (wave:5) + `argocd-apps/arc-runners.yaml` (wave:6) + `argocd-apps/ci-cd.yaml` → `infrastructure/ci-cd/`.
 Objects: ARC controller (Helm, arc-systems), Runner scale set (Helm, arc-runners, label:`arc-solomon`, ephemeral ARM64 pods, DinD sidecar, 0→5 scale), 100Gi Docker layer cache PVC on agx-orin-prod-1, `arc-github-app` SealedSecret.
 Ingress: none (runners pull jobs from GitHub). Auth: GitHub App `solomon-arc` credentials in SealedSecret.
+
+---
+
+### `mcp-external`
+
+ArgoCD: none yet (placeholder namespace).
+Network-isolated namespace for third-party MCP servers that need internet access but must be
+isolated from the internal mesh. No workloads deployed yet. Cilium NetworkPolicy will allow
+internet egress from this namespace only.
+Ingress: none. Auth: none yet.
+
+---
+
+### `agents`
+
+ArgoCD: none yet (placeholder namespace).
+Catch-all for cross-cutting agents that span multiple tool namespaces and have no natural home.
+Prefer co-locating agents in their primary tool's namespace (see CLAUDE.md agent co-location rule).
+Only use this namespace when an agent genuinely belongs nowhere else.
+Ingress: per-agent HTTPRoute when deployed. Auth: per-agent AuthorizationPolicy.
 
 ---
 

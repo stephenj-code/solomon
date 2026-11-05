@@ -36,6 +36,27 @@ Run `/solomon` or say **"become solomon"** to initialize a session.
 
 ---
 
+## Documentation discipline
+
+**Every infrastructure change must update the relevant docs in the same commit.**
+
+| Changed | Update |
+|---------|--------|
+| Namespace added / removed | `ARCHITECTURE.md` namespace inventory + `CLAUDE.md` namespace table |
+| App port, hostname, or auth mode changed | `ARCHITECTURE.md` namespace entry |
+| New cross-namespace flow | `ARCHITECTURE.md` cross-namespace flows section |
+| Deny-by-default added / removed from a namespace | `ARCHITECTURE.md` + `CLAUDE.md` security posture |
+| ArgoCD Application path changed | `ARCHITECTURE.md` namespace entry + `CLAUDE.md` namespace table |
+| New tech stack component | `README.md` tech stack table |
+| Node topology change | `README.md` + `CLAUDE.md` + `ARCHITECTURE.md` node tables |
+| Migration task completed | `MIGRATION.md` — check the box; advance `Current active phase:` when all non-RUNTIME tasks in the phase are done |
+| New hard rule or constraint | `CLAUDE.md` key rules |
+
+Run `scripts/validate-docs.sh` before committing to catch namespace drift between
+`infrastructure/`, `ARCHITECTURE.md`, and `namespaces.yaml`.
+
+---
+
 ## Destructive actions — always require explicit Steve approval
 
 Stop and confirm before executing any of these, regardless of context:
