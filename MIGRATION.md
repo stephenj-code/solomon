@@ -147,11 +147,47 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 12 — Platform tooling
 
-- [ ] Install k9s on agx-orin-prod-1 (`curl -sS https://webinstall.dev/k9s | bash`)
+### On agx-orin-prod-1
+- [ ] Install k9s (`curl -sS https://webinstall.dev/k9s | bash`)
+- [ ] Install stern for multi-pod log tailing (`curl -sS https://webinstall.dev/stern | bash`)
+- [ ] Set up tmux default session for Solomon
+
+### SSH key auth (prerequisite for remote access)
 - [ ] Set up SSH key auth from Windows laptop to agx-orin-prod-1
 - [ ] Set up SSH key auth from Mac laptop to agx-orin-prod-1
-- [ ] Verify VS Code Remote SSH from both laptops
-- [ ] Set up tmux default session for Solomon on agx-orin-prod-1
+
+### Cloudflare Gateway DNS — LAN-wide threat blocking (free, ~5 min)
+- Protects every LAN device (nodes, laptops, phones) — blocks malware C2, phishing, ransomware download domains
+- [ ] Cloudflare Zero Trust dashboard → Settings → Gateway → DNS locations → note assigned Gateway DNS IPs
+- [ ] Set router primary/secondary DNS to those Gateway IPs (not 1.1.1.1 — Gateway IPs are org-specific)
+- [ ] Verify: query a known malware domain from any LAN device → should return REFUSED
+
+### Cloudflare WARP (Cloudflare One Client) — laptop security + remote cluster access
+- Protects laptops on any network (Gateway DNS follows the laptop off-LAN via WARP)
+- Provides remote kubectl/SSH access via private network routing through Cloudflare Tunnel
+- One client, two benefits — no VPN server needed, no open ports
+- [ ] Zero Trust dashboard → Settings → WARP Client → configure enrollment (email or one-time PIN)
+- [ ] Zero Trust dashboard → Networks → Tunnels → your tunnel → Private Networks:
+      add `192.168.1.49/32` as a private network route
+- [ ] Zero Trust dashboard → Settings → WARP Client → Device settings → Split Tunnels:
+      mode = "Include IPs and domains", add `192.168.1.49/32`
+- [ ] Install Cloudflare One Client on Windows laptop (`winget install Cloudflare.WARP`)
+- [ ] Install Cloudflare One Client on Mac laptop (`brew install --cask cloudflare-warp`)
+- [ ] Enroll both laptops: open WARP client → Login with Cloudflare Access → authenticate
+- [ ] Install kubectl on Windows laptop (`winget install Kubernetes.kubectl`)
+- [ ] Install kubectl on Mac laptop (`brew install kubectl`)
+- [ ] Copy kubeconfig from agx-orin to both laptops (`~/.kube/config`, server: `https://192.168.1.49:6443`)
+- [ ] Test from outside LAN: WARP on → `kubectl get nodes` → should work
+- [ ] Test from outside LAN: WARP on → `ssh stephen@192.168.1.49` → should work
+
+### VS Code Remote SSH
+- [ ] Verify VS Code Remote SSH works from both laptops (uses SSH key auth above)
+- [ ] (Optional) Install Lens on both laptops for GUI cluster browsing
+
+### Access patterns reference
+- **Pattern 1 (primary):** SSH into agx-orin → run `claude` there. kubectl native, MCP tools live. Best for infra changes.
+- **Pattern 2a (LAN):** WARP optional — kubeconfig `192.168.1.49:6443` works directly.
+- **Pattern 2b (remote):** WARP on → same kubeconfig — traffic routes through Cloudflare tunnel automatically.
 
 ---
 
