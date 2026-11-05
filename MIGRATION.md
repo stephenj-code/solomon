@@ -158,8 +158,10 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ### Cloudflare Gateway DNS — LAN-wide threat blocking (free, ~5 min)
 - Protects every LAN device (nodes, laptops, phones) — blocks malware C2, phishing, ransomware download domains
-- [ ] Cloudflare Zero Trust dashboard → Settings → Gateway → DNS locations → note assigned Gateway DNS IPs
-- [ ] Set router primary/secondary DNS to those Gateway IPs (not 1.1.1.1 — Gateway IPs are org-specific)
+- Simple option (no Zero Trust account needed): set router DNS to `1.1.1.2` / `1.0.0.2` (Cloudflare for Families — malware blocking)
+- Advanced option (custom policies + query logs): Zero Trust dashboard → Gateway → DNS Locations → create location → use assigned org-specific IPs
+- [ ] Set router primary DNS: `1.1.1.2`, secondary DNS: `1.0.0.2`
+- [ ] Set Jetson nodes DNS to `1.1.1.2` in `/etc/resolv.conf` (covers OS/package updates, image pulls)
 - [ ] Verify: query a known malware domain from any LAN device → should return REFUSED
 
 ### Cloudflare WARP (Cloudflare One Client) — laptop security + remote cluster access
