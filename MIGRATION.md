@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 8 — CI/CD**
+**Current active phase: Phase 9 — MCP servers**
 
 ---
 
@@ -111,11 +111,12 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 9 — MCP servers
 
-- [ ] Write solomon-kubernetes MCP server manifests (`infrastructure/mcp-servers/kubernetes/`)
-- [ ] Write solomon-prometheus MCP server manifests (`infrastructure/mcp-servers/prometheus/`)
-- [ ] Write solomon-filesystem MCP server manifests (`infrastructure/mcp-servers/filesystem/`)
-- [ ] Create `.mcp.json` in solomon repo root (bridge config pointing to in-cluster servers)
-- [ ] Test MCP bridges via `scripts/mcp-proxy.py`
+- [x] Write solomon-kubernetes MCP server manifests (`infrastructure/mcp-servers/kubernetes/`)
+- [x] Write solomon-prometheus MCP server manifests (`infrastructure/mcp-servers/prometheus/`)
+- [x] Write solomon-filesystem MCP server manifests (`infrastructure/mcp-servers/filesystem/`)
+- [x] Create `.mcp.json` in solomon repo root (bridge config pointing to in-cluster servers)
+- [ ] **RUNTIME**: Generate SSH keypair for solomon-filesystem node_exec; distribute pubkey to all 3 nodes; seal privkey → `infrastructure/mcp-servers/filesystem/sealed-secrets/filesystem-ssh-key-sealed.yaml`
+- [ ] Test MCP bridges via `scripts/mcp-proxy.py` (run after Phase 13 migration)
 
 ---
 

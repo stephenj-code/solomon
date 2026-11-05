@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "solomon-kubernetes": {
+      "command": "python3",
+      "args": ["scripts/mcp-proxy.py", "kubernetes"]
+    },
+    "solomon-prometheus": {
+      "command": "python3",
+      "args": ["scripts/mcp-proxy.py", "prometheus"]
+    },
+    "solomon-filesystem": {
+      "command": "python3",
+      "args": ["scripts/mcp-proxy.py", "filesystem"]
+    }
+  }
+}
