@@ -9,6 +9,7 @@ This is the platform repo for **project-solomon**: a self-hosted 3-node Kubernet
 - `scripts/` — Bootstrap scripts and MCP proxy bridges
 - `.claude/commands/` — Solomon slash commands (`/solomon` session init)
 - `MIGRATION.md` — Cluster build/migration task checklist
+- `ARCHITECTURE.md` — Per-namespace object inventory, ingress patterns, cross-namespace flows. **Read before writing or modifying any manifest, HTTPRoute, Istio policy, or ArgoCD Application.**
 
 ## Quick start
 
