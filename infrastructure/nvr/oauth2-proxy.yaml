@@ -1,0 +1,116 @@
+# oauth2-proxy-frigate — per-service OIDC proxy for Frigate NVR UI.
+#
+# Unlike the shared oauth2-proxy in `auth` (which uses --upstream=static://202),
+# this instance is a full reverse proxy: it validates the Keycloak session and
+# forwards authenticated requests directly to Frigate at 192.168.1.49:5000.
+#
+# Keycloak setup required before Phase 13 (run in Keycloak admin console):
+#   Realm:        solomon
+#   Client ID:    frigate
+#   Client type:  OpenID Connect (confidential)
+#   Redirect URI: https://frigate.project-solomon.ai/oauth2/callback
+#   Scopes:       openid, profile, email
+#   After creating the client, copy the client secret for sealing below.
+#
+# Secrets required before Phase 13:
+#   oauth2-proxy-frigate-secrets — OAUTH2_PROXY_CLIENT_SECRET, OAUTH2_PROXY_COOKIE_SECRET
+#
+# Generate cookie secret (32 bytes, base64-encoded):
+#   python3 -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())'
+#
+# Seal the secret:
+#   kubectl create secret generic oauth2-proxy-frigate-secrets \
+#     --namespace nvr \
+#     --from-literal=OAUTH2_PROXY_CLIENT_SECRET=<keycloak-client-secret> \
+#     --from-literal=OAUTH2_PROXY_COOKIE_SECRET=<generated-cookie-secret> \
+#     --dry-run=client -o yaml | \
+#     kubeseal --cert scripts/sealed-secrets.pem --format yaml \
+#     > infrastructure/nvr/sealed-secrets/oauth2-proxy-frigate-secrets-sealed.yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oauth2-proxy-frigate
+  namespace: nvr
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy-frigate
+  namespace: nvr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy-frigate
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy-frigate
+    spec:
+      serviceAccountName: oauth2-proxy-frigate
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url=https://keycloak.project-solomon.ai/realms/solomon
+            - --client-id=frigate
+            - --redirect-url=https://frigate.project-solomon.ai/oauth2/callback
+            # Full reverse proxy to Frigate Docker host.
+            - --upstream=http://frigate.external.local:5000
+            - --email-domain=*
+            # Per-service cookie name avoids conflict with shared oauth2-proxy cookie.
+            - --cookie-name=_oauth2_proxy_frigate
+            - --cookie-domain=.project-solomon.ai
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            # Pass JWT downstream so Istio JWT policy can validate it.
+            - --set-authorization-header=true
+            - --pass-authorization-header=true
+            - --set-xauthrequest=true
+            - --skip-auth-route=^/ping$
+            - --http-address=0.0.0.0:4180
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-proxy-frigate-secrets
+                  key: OAUTH2_PROXY_CLIENT_SECRET
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-proxy-frigate-secrets
+                  key: OAUTH2_PROXY_COOKIE_SECRET
+          ports:
+            - containerPort: 4180
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy-frigate
+  namespace: nvr
+spec:
+  selector:
+    app: oauth2-proxy-frigate
+  ports:
+    - port: 4180
+      targetPort: 4180

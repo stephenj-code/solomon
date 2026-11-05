@@ -1,0 +1,29 @@
+# ServiceEntry — registers Frigate NVR into the Istio mesh.
+#
+# Frigate runs as a Docker container on agx-orin-prod-1 (192.168.1.49:5000),
+# with --network=host and --privileged for GPU passthrough. It is intentionally
+# NOT in Kubernetes — host networking + GPU passthrough + single-instance bring
+# no benefit from k8s orchestration.
+#
+# This ServiceEntry lets mesh-enrolled pods (specifically oauth2-proxy-frigate
+# in the nvr namespace) call Frigate using a stable mesh hostname, with
+# traffic classified as MESH_EXTERNAL so ztunnel does not apply mTLS on egress.
+#
+# Consumer: oauth2-proxy-frigate uses http://frigate.external.local:5000 as
+# its --upstream. Istio routes that FQDN to 192.168.1.49 via this entry.
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: frigate
+  namespace: nvr
+spec:
+  hosts:
+    - frigate.external.local
+  ports:
+    - number: 5000
+      name: http
+      protocol: HTTP
+  location: MESH_EXTERNAL
+  resolution: STATIC
+  endpoints:
+    - address: 192.168.1.49

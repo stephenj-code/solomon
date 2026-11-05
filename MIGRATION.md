@@ -3,7 +3,7 @@
 Track progress of the fresh cluster build. Check off items as completed.
 Solomon reads this file on session start to surface the current phase and open tasks.
 
-**Current active phase: Phase 9 — MCP servers**
+**Current active phase: Phase 10 — NVR (Frigate)**
 
 ---
 
@@ -122,11 +122,12 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 10 — NVR (Frigate)
 
-- [ ] Move Frigate RTSP credentials from Docker env vars to `/data/frigate/.env` (chmod 600)
-- [ ] Write Istio ServiceEntry for Frigate (`infrastructure/nvr/serviceentry.yaml`)
-- [ ] Write HTTPRoute for `frigate.project-solomon.ai` (`infrastructure/nvr/httproute.yaml`)
-- [ ] Write Keycloak client + oauth2-proxy for Frigate UI access
-- [ ] Add `argocd-apps/nvr.yaml` ArgoCD Application
+- [ ] **RUNTIME**: Move Frigate RTSP credentials from Docker env vars to `/data/frigate/.env` (chmod 600)
+- [x] Write Istio ServiceEntry for Frigate (`infrastructure/nvr/serviceentry.yaml`)
+- [x] Write HTTPRoute for `frigate.project-solomon.ai` (`infrastructure/nvr/httproute.yaml`)
+- [x] Write oauth2-proxy for Frigate UI access (`infrastructure/nvr/oauth2-proxy.yaml`)
+- [x] Add `argocd-apps/nvr.yaml` ArgoCD Application
+- [ ] **RUNTIME**: Create Keycloak `frigate` OIDC client; seal `oauth2-proxy-frigate-secrets` → `infrastructure/nvr/sealed-secrets/oauth2-proxy-frigate-secrets-sealed.yaml`
 - [ ] Create frigate-agent repo: `scripts/new-app.sh frigate-agent`
 - [ ] Implement frigate-agent LangGraph tools (events, snapshots, config, stats)
 - [ ] Test Muse Glimmer vision on Frigate snapshots (end-to-end agent query)
@@ -135,8 +136,8 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ## Phase 11 — Agents
 
-- [ ] Write `templates/app-template/` — canonical app scaffold in this repo (see Phase 11 for full structure)
-- [ ] Write `scripts/new-app.sh` — creates GitHub repo from template, substitutes app name, pushes
+- [x] Write `templates/app-template/` — canonical app scaffold in this repo (see Phase 11 for full structure)
+- [x] Write `scripts/new-app.sh` — creates GitHub repo from template, substitutes app name, pushes
 - [ ] Implement `templates/app-template/.github/workflows/provision.yaml` (Cloudflare, Keycloak, LiteLLM, ArgoCD, agent registry)
 - [ ] Add Trivy image scan + Bandit/Semgrep to `templates/app-template/.github/workflows/build.yaml`
 - [ ] Create security-agent repo: `scripts/new-app.sh security-agent`
