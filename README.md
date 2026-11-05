@@ -178,14 +178,31 @@ See `MIGRATION.md` for the full phased migration checklist including all RUNTIME
 
 ---
 
-## Branching
+## Branching and releases
 
+Branch names and commit type prefixes (`feat:`, `fix:`, `chore:`) are independent.
+A `v0.1` milestone branch holds commits of every type. `feat/*` branches are short-lived
+topic branches, not tied to commit type.
+
+**Pre-launch** (manifests being built, no live cluster yet):
 ```
-main     ArgoCD target. Stable, always deployable. Direct commits for small safe changes.
-v0.1     Current: initial cluster build. Merges to main when bootstrapped and healthy.
-feat/*   Short-lived. Risky infra changes (CNI upgrade, Istio upgrade, new operator).
-fix/*    Short-lived. Hotfixes.
+main    ArgoCD target.
+v0.1    All milestone work accumulates here.
+feat/*  Short-lived, branches from v0.1 for large risky sub-tasks.
+─────────────────────────────────────────
+Phase 13 done + cluster healthy → merge v0.1 → main → tag v0.1
 ```
+
+**Post-launch** (live cluster, Phase 13+):
+```
+main    ArgoCD target. Direct commits for safe changes.
+feat/*  Short-lived. Risky changes only — branch from main, merge after verify.
+fix/*   Short-lived. Complex hotfixes only — same lifecycle.
+─────────────────────────────────────────
+Milestones tagged on main: v0.2, v1.0, etc.
+```
+
+Tags represent **verified cluster states** — only ever on `main`.
 
 All commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `ci:`. Breaking changes: append `!`.

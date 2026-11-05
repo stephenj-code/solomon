@@ -256,40 +256,59 @@ Solomon writes commits in this format by default. Never write vague messages lik
 
 ---
 
-## Branching strategy
+## Branching and release strategy
 
-### Platform repo (this repo)
+**Important distinction:** branch names and commit type prefixes (`feat:`, `fix:`) are
+orthogonal. A `v0.1` milestone branch contains commits of every type. `feat/*` branches
+are short-lived topic branches, not related to commit type prefixes.
 
+### Platform repo (this repo) — two phases
+
+**Pre-launch (before Phase 13 migration):**
 ```
-main        ArgoCD watches this. Stable, always deployable. Direct commits for small safe changes.
-v0.1        Current: initial cluster build. Merge to main when cluster is bootstrapped and healthy.
-feat/<name> Short-lived. Big or risky infra changes (CNI upgrade, new operator, Istio upgrade).
-fix/<name>  Short-lived. Hotfixes.
+main        ArgoCD target. Stable. No live cluster to break yet.
+v0.1        Current. All milestone manifest work accumulates here — any commit type.
+feat/*      Short-lived. Branch from v0.1 for large/risky sub-tasks; merge back to v0.1.
+
+Phase 13 complete + cluster verified healthy
+  → merge v0.1 → main → git tag v0.1 on main → delete v0.1 branch
 ```
 
-**When to use a feature branch:** anything that could destabilize the cluster if it goes wrong. Small config changes, adding namespaces, bumping image tags → direct to `main`.
+**Post-launch (Phase 13+, live cluster):**
+```
+main        ArgoCD target. Direct commits for small safe changes.
+feat/*      Short-lived. Risky changes only (CNI upgrade, Istio upgrade, new operator).
+            Branch from main → make changes → verify on branch → merge to main.
+fix/*       Short-lived. Complex hotfixes only. Same lifecycle as feat/*.
+            Simple fixes go direct to main.
+```
 
-**Tagging milestones manually:**
+No new `v0.x` accumulator branches post-launch unless work is large enough to warrant
+isolating from `main` for weeks (e.g. a full Istio major version upgrade).
+
+**Tags — only ever on main, represent verified cluster states:**
+```
+v0.1   Phase 13 complete — all namespaces healthy, ArgoCD green, MCP tools live
+v0.2   First agent deployed end-to-end, full GitOps round-trip verified
+v1.0   Production-ready — Velero backups proven, monitoring tuned, all agents running
+```
 
 ```bash
-git tag v0.1    # initial cluster healthy
-git tag v0.2    # first app deployed end-to-end
-git push origin --tags
-```
+# After merging milestone branch and verifying cluster
+git tag v0.1 && git push origin --tags
 
-**Generating a changelog:**
-
-```bash
+# Generate changelog between milestones
 git-cliff v0.1..v0.2 --output CHANGELOG.md
-git add CHANGELOG.md && git commit -m "docs: update changelog for v0.2"
+git add CHANGELOG.md && git commit -m "docs: changelog for v0.2"
 ```
 
 ### App repos (per service/agent/api)
 
 ```
-main        ArgoCD watches this. Push to main = deploy to cluster.
-feat/<name> Non-trivial features, dependency changes, agent graph changes.
-fix/<name>  Bug fixes (small ones can go direct to main).
+main        ArgoCD target. Push to main = deploy to cluster.
+feat/*      Non-trivial features, dependency changes, agent graph changes.
+fix/*       Complex bug fixes. Simple fixes go direct to main.
 ```
 
-**Releases via release-please:** a GitHub Action watches `main` for conventional commits and opens a Release PR automatically. Merge to cut a release → git tag + GitHub Release + CHANGELOG.md generated automatically.
+Releases via **release-please**: watches `main` for conventional commits, opens a Release PR
+automatically. Merge to cut a release → git tag + GitHub Release + CHANGELOG.md.
