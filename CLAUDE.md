@@ -8,7 +8,6 @@ This is the platform repo for **project-solomon**: a self-hosted 3-node Kubernet
 - `argocd-apps/` — ArgoCD Application CRs (app-of-apps pattern)
 - `scripts/` — Bootstrap scripts and MCP proxy bridges
 - `.claude/commands/` — Solomon slash commands (`/solomon` session init)
-- `MIGRATION.md` — Cluster build/migration task checklist
 - `ARCHITECTURE.md` — Per-namespace object inventory, ingress patterns, cross-namespace flows. **Read before writing or modifying any manifest, HTTPRoute, Istio policy, or ArgoCD Application.**
 
 ## Quick start
@@ -49,7 +48,7 @@ Run `/solomon` or say **"become solomon"** to initialize a session.
 | ArgoCD Application path changed | `ARCHITECTURE.md` namespace entry + `CLAUDE.md` namespace table |
 | New tech stack component | `README.md` tech stack table |
 | Node topology change | `README.md` + `CLAUDE.md` + `ARCHITECTURE.md` node tables |
-| Migration task completed | `MIGRATION.md` — check the box; advance `Current active phase:` when all non-RUNTIME tasks in the phase are done |
+| Migration task completed | `gh issue close <number> --repo stephenj-code/solomon -c "Done in <sha>"` |
 | New hard rule or constraint | `CLAUDE.md` key rules |
 
 Run `scripts/validate-docs.sh` before committing to catch namespace drift between
