@@ -127,7 +127,7 @@ Solomon reads this file on session start to surface the current phase and open t
 - [x] Write HTTPRoute for `frigate.project-solomon.ai` (`infrastructure/nvr/httproute.yaml`)
 - [x] Write oauth2-proxy for Frigate UI access (`infrastructure/nvr/oauth2-proxy.yaml`)
 - [x] Add `argocd-apps/nvr.yaml` ArgoCD Application
-- [ ] **RUNTIME**: Create Keycloak `frigate` OIDC client; seal `oauth2-proxy-frigate-secrets` → `infrastructure/nvr/sealed-secrets/oauth2-proxy-frigate-secrets-sealed.yaml`
+- [ ] **RUNTIME**: Create Keycloak `frigate` OIDC client; seal `oauth2-proxy-frigate-secrets` → `infrastructure/sealed-secrets/nvr/oauth2-proxy-frigate-secrets-sealed.yaml`
 - [ ] Create frigate-agent repo: `scripts/new-app.sh frigate-agent`
 - [ ] Implement frigate-agent LangGraph tools (events, snapshots, config, stats)
 - [ ] Test Muse Glimmer vision on Frigate snapshots (end-to-end agent query)

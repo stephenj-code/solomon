@@ -1,0 +1,4 @@
+# Placeholder — ArgoCD self-management config lives here.
+# Add AppProject, notification templates, or RBAC configs as needed.
+# The gitops ArgoCD Application (argocd-apps/gitops.yaml) syncs this directory
+# with selfHeal: false so ArgoCD never overwrites itself automatically.
