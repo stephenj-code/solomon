@@ -83,10 +83,13 @@ else
     # Extract namespace names from namespaces.yaml
     mapfile -t yaml_namespaces < <(grep "^  name:" "$NAMESPACES_FILE" | awk '{print $2}')
 
-    # Extract namespace names from CLAUDE.md namespace inventory table
-    # Matches lines like: | `arc-systems` | ARC controller |
+    # Extract namespace names from CLAUDE.md namespace inventory table only.
+    # awk scopes to lines between "## Namespace inventory" and the next "## " heading
+    # so we don't match backtick words in other tables (template types, commit types, etc.)
     mapfile -t claude_namespaces < <(
-        grep -oP "(?<=\| \`)[a-z][a-z0-9-]+(?=\`)" "$CLAUDE_MD" 2>/dev/null | sort -u
+        awk '/^## Namespace inventory/{found=1; next} /^## /{found=0} found && /^\|/' "$CLAUDE_MD" \
+        | grep -oP "(?<=\| \`)[a-z][a-z0-9-]+(?=\`)" \
+        | sort -u
     )
 
     # Every namespace in namespaces.yaml should appear in CLAUDE.md

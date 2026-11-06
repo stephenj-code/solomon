@@ -201,23 +201,28 @@ Each template's `CLAUDE.md` explains the add-new-X workflow for that language.
 
 | Template | SAST | Test |
 |----------|------|------|
-| `api` | Bandit + Semgrep (python) | — |
-| `agent` | Bandit + Semgrep (python) | — |
+| `api` | Bandit + Semgrep (python) | pytest in Docker `test` stage — health, readiness, DB mock |
+| `agent` | Bandit + Semgrep (python) | pytest in Docker `test` stage — health endpoint |
+| `job` / `cronjob` | Bandit + Semgrep (python) | pytest in Docker `test` stage — step functions with mocked services |
 | `react` | Semgrep (javascript) | TypeScript errors caught by `npm run build` in Dockerfile |
 | `rust` | cargo clippy | cargo test |
 
-All four: Docker build → Trivy image scan (fail on CRITICAL) → push to GHCR → patch `k8s/deployment.yaml` SHA.
+Tests run in a dedicated Docker `test` stage that inherits production deps and adds only pytest — the stage is never pushed to GHCR. CI fails the build before the production image is tagged if any test fails.
+
+All templates: Docker build → Trivy image scan (fail on CRITICAL) → push to GHCR → patch `k8s/deployment.yaml` SHA.
 
 ### Create a new app
 
 ```bash
-scripts/new-app.sh <name> [agent|api|react|rust] [namespace]
+scripts/new-app.sh <name> [agent|api|react|rust|job|cronjob] [namespace]
 
 # Examples
 scripts/new-app.sh frigate-agent            # LangGraph agent (default)
 scripts/new-app.sh results-api api          # FastAPI service
 scripts/new-app.sh geometry-ui react        # Vite + React UI
 scripts/new-app.sh compute-core rust        # Axum Rust service
+scripts/new-app.sh migrate-data job         # one-shot batch job
+scripts/new-app.sh nightly-report cronjob   # scheduled batch job
 ```
 
 Creates a private GitHub repo under `stephenj-code/<name>`, copies the template, substitutes

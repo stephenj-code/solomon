@@ -96,6 +96,7 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | `ai` | llama-server (Muse Glimmer 30B), vllm (Nemotron3 Nano), LiteLLM proxy, **litellm-agent** |
 | `backup` | Velero, MinIO, **backup-agent** |
 | `database` | CloudNativePG operator + shared postgres cluster, **database-agent** |
+| `networking` | cloudflared (Cloudflare Tunnel), Istio IngressGateway, Cilium NetworkPolicies |
 | `mcp-servers` | solomon-kubernetes, solomon-prometheus, solomon-filesystem — Solomon tools only |
 | `mcp-external` | Third-party MCP servers (network-isolated) |
 | `nvr` | **frigate-agent** only — Frigate itself runs as Docker on agx-orin-prod-1 host |
