@@ -15,9 +15,9 @@ consistently, and handles day-to-day operations.
 
 | Node             | Role                | RAM   | IP            |
 |------------------|---------------------|-------|---------------|
-| agx-orin-prod-1  | control-plane + GPU | 61 GB | x.x.x.49  |
-| orin-nano-prod-1 | worker              | 7 GB  | x.x.x.175 |
-| orin-nano-dev-1  | worker              | 7 GB  | x.x.x.139 |
+| agx-orin-prod-1  | control-plane + GPU | 61 GB | <cp-ip>  |
+| orin-nano-prod-1 | worker              | 7 GB  | <w1-ip> |
+| orin-nano-dev-1  | worker              | 7 GB  | <w2-ip> |
 
 All nodes: NVIDIA Jetson ARM64. LLM inference and ARC runners pin to agx-orin-prod-1
 (61 GB RAM, 1 TB SSD, GPU).
@@ -44,7 +44,7 @@ All nodes: NVIDIA Jetson ARM64. LLM inference and ARC runners pin to agx-orin-pr
 | Istio IngressGateway | Cluster ingress — hostPort :443 (LAN) + ClusterIP :80 (Cloudflare tunnel) |
 | Kubernetes Gateway API | `HTTPRoute` + `Gateway` — no Istio VirtualService |
 | Cloudflare Tunnel | External HTTPS → IngressGateway |
-| dnsmasq | Split DNS on agx-orin-prod-1 — `*.project-solomon.ai` → x.x.x.49 for LAN clients |
+| dnsmasq | Split DNS on agx-orin-prod-1 — `*.project-solomon.ai` → <cp-ip> for LAN clients |
 
 ### Auth
 

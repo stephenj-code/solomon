@@ -76,9 +76,9 @@ When designing a plan that includes any of these: stop, describe what and why, w
 
 | Node | Role | RAM | IP |
 |------|------|-----|----|
-| agx-orin-prod-1 | control-plane + GPU workloads | 61 GB | x.x.x.49 |
-| orin-nano-prod-1 | worker | 7 GB | x.x.x.175 |
-| orin-nano-dev-1 | worker | 7 GB | x.x.x.139 |
+| agx-orin-prod-1 | control-plane + GPU workloads | 61 GB | <cp-ip> |
+| orin-nano-prod-1 | worker | 7 GB | <w1-ip> |
+| orin-nano-dev-1 | worker | 7 GB | <w2-ip> |
 
 **agx-orin-prod-1** hosts: llama-server (Muse Glimmer 30B, llama.cpp), vllm (Nemotron3 Nano 30B-A3B), ARC self-hosted runners, Docker layer cache (1 TB SSD), dnsmasq (LAN DNS), Frigate NVR (Docker, not k8s), control-plane components.
 
@@ -104,7 +104,7 @@ When designing a plan that includes any of these: stop, describe what and why, w
 | `security` | Trivy Operator, **security-agent** |
 | `agents` | Cross-cutting agents with no natural home namespace |
 
-**Frigate note:** Frigate NVR runs as a Docker container on agx-orin-prod-1 (`--network=host`, `--privileged`, nvidia runtime). It is intentionally NOT in Kubernetes — host networking + GPU passthrough + single-instance bring no benefit from k8s orchestration. Exposed to the cluster via Istio `ServiceEntry` → `HTTPRoute` → `frigate.project-solomon.ai`. The frigate-agent calls `http://x.x.x.49:5000` directly.
+**Frigate note:** Frigate NVR runs as a Docker container on agx-orin-prod-1 (`--network=host`, `--privileged`, nvidia runtime). It is intentionally NOT in Kubernetes — host networking + GPU passthrough + single-instance bring no benefit from k8s orchestration. Exposed to the cluster via Istio `ServiceEntry` → `HTTPRoute` → `frigate.project-solomon.ai`. The frigate-agent calls `http://<cp-ip>:5000` directly.
 
 ---
 
@@ -115,8 +115,8 @@ External user
   DNS: <subdomain>.project-solomon.ai → Cloudflare
   Cloudflare Tunnel → cloudflared pod → Istio IngressGateway (ClusterIP :80)
 
-LAN user (DNS set to x.x.x.49)
-  DNS: <subdomain>.project-solomon.ai → dnsmasq → x.x.x.49
+LAN user (DNS set to <cp-ip>)
+  DNS: <subdomain>.project-solomon.ai → dnsmasq → <cp-ip>
   Direct → Istio IngressGateway (hostPort :443, wildcard TLS via cert-manager)
 
 Istio IngressGateway

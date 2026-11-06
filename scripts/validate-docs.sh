@@ -4,7 +4,8 @@
 # Checks:
 #   1. Every infrastructure/ subdirectory is mentioned in ARCHITECTURE.md
 #   2. Every namespace in namespaces.yaml is documented in ARCHITECTURE.md
-#   3. No unencrypted Secret objects in staged (or all tracked) YAML files
+#   3. CLAUDE.md namespace inventory matches namespaces.yaml
+#   4. No unencrypted Secret objects in staged (or all tracked) YAML files
 #
 # Usage:
 #   scripts/validate-docs.sh          # check everything
@@ -14,6 +15,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARCH="$REPO_ROOT/ARCHITECTURE.md"
+CLAUDE_MD="$REPO_ROOT/CLAUDE.md"
 NAMESPACES_FILE="$REPO_ROOT/infrastructure/namespaces/namespaces.yaml"
 INFRA_DIR="$REPO_ROOT/infrastructure"
 
@@ -36,7 +38,7 @@ section "infrastructure/ → ARCHITECTURE.md coverage"
 
 for dir in "$INFRA_DIR"/*/; do
     name="$(basename "$dir")"
-    # Skip dirs that don't map 1:1 to a k8s namespace
+    # These dirs don't map to a namespace and aren't expected in the namespace sections
     case "$name" in
         namespaces|sealed-secrets) continue ;;
     esac
@@ -56,9 +58,9 @@ section "namespaces.yaml → ARCHITECTURE.md coverage"
 if [[ ! -f "$NAMESPACES_FILE" ]]; then
     warn "namespaces.yaml not found at $NAMESPACES_FILE — skipping"
 else
+    # Anchor to lines that are exactly "  name: <value>" (metadata.name indentation)
     while IFS= read -r ns; do
         [[ -z "$ns" ]] && continue
-        # Skip system namespaces
         case "$ns" in
             kube-system|kube-public|kube-node-lease|default) continue ;;
         esac
@@ -68,10 +70,52 @@ else
         else
             fail "namespace '$ns' in namespaces.yaml not documented in ARCHITECTURE.md"
         fi
-    done < <(grep "name:" "$NAMESPACES_FILE" | awk '{print $2}')
+    done < <(grep "^  name:" "$NAMESPACES_FILE" | awk '{print $2}')
 fi
 
-# ── 3. No unencrypted Secret objects ─────────────────────────────────────────
+# ── 3. CLAUDE.md namespace inventory matches namespaces.yaml ─────────────────
+
+section "CLAUDE.md namespace inventory → namespaces.yaml"
+
+if [[ ! -f "$NAMESPACES_FILE" ]]; then
+    warn "namespaces.yaml not found — skipping CLAUDE.md cross-check"
+else
+    # Extract namespace names from namespaces.yaml
+    mapfile -t yaml_namespaces < <(grep "^  name:" "$NAMESPACES_FILE" | awk '{print $2}')
+
+    # Extract namespace names from CLAUDE.md namespace inventory table
+    # Matches lines like: | `arc-systems` | ARC controller |
+    mapfile -t claude_namespaces < <(
+        grep -oP "(?<=\| \`)[a-z][a-z0-9-]+(?=\`)" "$CLAUDE_MD" 2>/dev/null | sort -u
+    )
+
+    # Every namespace in namespaces.yaml should appear in CLAUDE.md
+    for ns in "${yaml_namespaces[@]}"; do
+        [[ -z "$ns" ]] && continue
+        if printf '%s\n' "${claude_namespaces[@]}" | grep -qx "$ns"; then
+            ok "CLAUDE.md documents namespace: $ns"
+        else
+            fail "namespace '$ns' in namespaces.yaml missing from CLAUDE.md namespace inventory"
+        fi
+    done
+
+    # Every namespace in CLAUDE.md inventory should exist in namespaces.yaml
+    # (catches stale entries in CLAUDE.md)
+    for ns in "${claude_namespaces[@]}"; do
+        [[ -z "$ns" ]] && continue
+        # Skip namespaces managed by external Helm charts (not in our namespaces.yaml)
+        case "$ns" in
+            argocd|istio-system|cert-manager|kube-system) continue ;;
+        esac
+        if printf '%s\n' "${yaml_namespaces[@]}" | grep -qx "$ns"; then
+            : # ok, already reported above
+        else
+            warn "CLAUDE.md namespace '$ns' not found in namespaces.yaml — stale entry?"
+        fi
+    done
+fi
+
+# ── 4. No unencrypted Secret objects ─────────────────────────────────────────
 
 section "Unencrypted Secret check"
 
