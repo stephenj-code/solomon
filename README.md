@@ -182,15 +182,48 @@ You write YAML → ArgoCD applies it → kube-apiserver stores it in etcd
 
 ---
 
-## New app
+## App templates
+
+Every app starts from one of four templates, each built around the same five concepts:
+
+| Concept | What it is | `api` | `agent` | `react` | `rust` |
+|---------|-----------|-------|---------|---------|--------|
+| **Structure** | How the app is wired together — routes/graph | `routes.py` | `graph.py` | `routes.tsx` | `router.rs` |
+| **Logic** | What actually happens per request/node/page | `handlers.py` | `nodes.py` | `pages/` | `handlers.rs` |
+| **Data** | Shapes flowing through the app | `models.py` | `state.py` | `types.ts` | `models.rs` |
+| **Capabilities** | External calls — DB queries, API calls, tools | `services.py` | `tools.py` | `api.ts` | `services.rs` |
+| **Config** | Settings, env vars, behavior instructions | `config.py` | `prompts.py` | `config.ts` | `config.rs` |
+
+Understanding these five concepts means understanding every app type in the cluster.
+Each template's `CLAUDE.md` explains the add-new-X workflow for that language.
+
+### Build pipeline by template
+
+| Template | SAST | Test |
+|----------|------|------|
+| `api` | Bandit + Semgrep (python) | — |
+| `agent` | Bandit + Semgrep (python) | — |
+| `react` | Semgrep (javascript) | TypeScript errors caught by `npm run build` in Dockerfile |
+| `rust` | cargo clippy | cargo test |
+
+All four: Docker build → Trivy image scan (fail on CRITICAL) → push to GHCR → patch `k8s/deployment.yaml` SHA.
+
+### Create a new app
 
 ```bash
-scripts/new-app.sh <name> [namespace]
+scripts/new-app.sh <name> [agent|api|react|rust] [namespace]
+
+# Examples
+scripts/new-app.sh frigate-agent            # LangGraph agent (default)
+scripts/new-app.sh results-api api          # FastAPI service
+scripts/new-app.sh geometry-ui react        # Vite + React UI
+scripts/new-app.sh compute-core rust        # Axum Rust service
 ```
 
-Creates a GitHub repo from `templates/app-template/`, pushes initial commit.
-`provision.yaml` runs automatically and bootstraps: Cloudflare CNAME, Keycloak client
-(SealedSecret), LiteLLM virtual key (SealedSecret), ArgoCD Application in platform repo.
+Creates a private GitHub repo under `stephenj-code/<name>`, copies the template, substitutes
+placeholders, pushes to main. `provision.yaml` runs automatically and bootstraps:
+Cloudflare CNAME, Keycloak client (SealedSecret), LiteLLM virtual key (SealedSecret),
+ArgoCD Application in platform repo.
 Optional: CloudNativePG database (`needs.database: true`), oauth2-proxy + Keycloak browser
 client (`needs.ui: true`).
 
