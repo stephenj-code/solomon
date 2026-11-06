@@ -19,6 +19,12 @@ metadata:
 spec:
   instances: 1
 
+  # Pin to explicit image — ghcr.io/cloudnative-pg/postgresql:16 includes pgvector.
+  # Any database in this cluster can enable vector search with:
+  #   CREATE EXTENSION vector;
+  # Used by agents that need semantic memory over computations, embeddings, or paper chunks.
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+
   postgresql:
     parameters:
       timezone: America/New_York

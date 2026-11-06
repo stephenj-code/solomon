@@ -172,9 +172,10 @@ Auth: `allow-vllm-internal` (litellm SA only → vllm).
 ### `database`
 
 ArgoCD: `argocd-apps/database.yaml` + `argocd-apps/cloudnativepg.yaml` → `infrastructure/database/` wave:6.
-Objects: CloudNativePG operator (Helm), Cluster `shared` (3-instance postgres), Database CRs in `infrastructure/database/databases/<app>.yaml` (one per app that needs a DB).
+Objects: CloudNativePG operator (Helm), Cluster `shared` (PostgreSQL 16, pgvector included), Database CRs in `infrastructure/database/databases/<app>.yaml` (one per app that needs a DB).
 Endpoints: `shared-rw.database.svc.cluster.local:5432` (read-write), `shared-r.database.svc.cluster.local:5432` (read-only).
 Pattern: CNPG creates Secret `<app>-app` in `database` namespace. Manually extract, seal into app's namespace as `<app>-db` SealedSecret. `provision.yaml` handles this automatically for new apps.
+pgvector: available on every database — enable with `CREATE EXTENSION vector;`. Use for agent semantic memory, embeddings, and computation history search.
 Ingress: none. Auth: Cilium NetworkPolicy (no Istio deny-all on database ns).
 
 ---
