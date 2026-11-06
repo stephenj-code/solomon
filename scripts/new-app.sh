@@ -57,7 +57,7 @@ esac
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="$REPO_ROOT/templates/${TEMPLATE_TYPE}-template"
+TEMPLATE_DIR="$REPO_ROOT/templates/${TEMPLATE_TYPE}"
 WORK_DIR="$(mktemp -d)"
 APP_DIR="$WORK_DIR/$APP_NAME"
 

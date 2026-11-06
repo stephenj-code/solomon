@@ -27,7 +27,7 @@ Run `/solomon` or say **"become solomon"** to initialize a session.
 - **HuggingFace token required** — llama-server and vllm pull models from HuggingFace on first start; token stored as SealedSecret in `ai` namespace
 - **Never modify** kube-system, kube-public, kube-node-lease namespaces
 - **Never store secrets in plaintext** — always Sealed Secrets (`kubeseal`); exception: Frigate RTSP creds live in `/data/frigate/.env` (chmod 600) on the host
-- **Every new service** must be provisioned via `scripts/new-app.sh <name>` (uses `templates/app-template/` in this repo)
+- **Every new service** must be provisioned via `scripts/new-app.sh <name> [agent|api|react|rust]` (uses `templates/<type>/` in this repo)
 - **After any infra change** — check `argocd-apps/` for stale or missing Application CRs
 - **Agent co-location** — agents live in their tool's namespace (see namespace inventory); `agents` namespace is catch-all only
 - **All agents registered in LiteLLM agent registry** — provisioning workflow handles this automatically

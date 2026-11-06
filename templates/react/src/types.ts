@@ -17,6 +17,20 @@ export interface DashboardStats {
   value: number;
 }
 
+// AG-UI — agent chat
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  toolCalls?: ToolCall[];
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  status: "running" | "done";
+}
+
 // Add your domain types below:
 // export interface Item {
 //   id: string;

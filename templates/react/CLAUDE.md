@@ -54,6 +54,30 @@ Common classes:
 - Text: `text-sm`, `text-gray-500`, `font-semibold`
 - Box: `bg-white`, `rounded-xl`, `border`, `border-gray-200`
 
+## AgentChat — connecting to a LangGraph agent
+
+`src/components/AgentChat.tsx` is a ready-made chat UI that connects to any agent's
+`POST /v1/agui` endpoint (AG-UI Protocol — typed SSE events).
+
+```tsx
+import { AgentChat } from "../components/AgentChat";
+import { config } from "../config";
+
+// Drop it into any page:
+<AgentChat agentUrl={config.agentUrl} />
+```
+
+Set `VITE_AGENT_URL=https://my-agent.project-solomon.ai` in your environment.
+If `VITE_AGENT_URL` is empty, the component shows a placeholder instead of erroring.
+
+What it shows as the agent runs:
+- Text streams in token by token
+- "⟳ search_database…" appears while a tool is running, disappears when done
+- Error messages if the agent fails
+
+The component uses `fetch` + `ReadableStream` (not `EventSource`) because
+AG-UI sends POST requests, not GET. EventSource only does GET.
+
 ## TypeScript quick reference
 
 - `interface` — defines the shape of an object

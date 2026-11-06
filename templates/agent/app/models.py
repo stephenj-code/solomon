@@ -26,3 +26,8 @@ class StreamRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     version: str
+
+
+class AguiRequest(BaseModel):
+    message: str
+    thread_id: str | None = None  # pass to continue a conversation

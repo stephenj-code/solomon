@@ -44,3 +44,40 @@ Omit `thread_id` to start a new conversation.
 
 `POST /v1/stream` returns Server-Sent Events. Each `data:` line is a token chunk.
 `data: [DONE]` signals the end of the stream.
+
+## AG-UI (agent + UI)
+
+`POST /v1/agui` streams typed SSE events that a React UI can render in real time.
+Use this endpoint instead of `/v1/stream` when the agent has a UI.
+
+Event types emitted:
+```
+RUN_STARTED          → run begins
+TEXT_MESSAGE_START   → assistant message starts
+TEXT_MESSAGE_CONTENT → one token delta (stream into the message)
+TEXT_MESSAGE_END     → assistant message complete
+TOOL_CALL_START      → a tool is being called (name visible to UI)
+TOOL_CALL_ARGS       → the arguments being passed to the tool
+TOOL_CALL_END        → tool returned
+RUN_FINISHED         → run complete
+RUN_ERROR            → something failed
+```
+
+The React template's `AgentChat` component consumes this endpoint automatically.
+No new dependencies — `astream_events` is already in `langchain-core`.
+
+## Agent-to-agent calls
+
+Call another agent by adding it as an HTTP tool:
+```python
+@tool
+def call_other_agent(message: str) -> str:
+    """Delegate to the other-agent service."""
+    import httpx
+    r = httpx.post("http://other-agent.other-ns.svc.cluster.local:8000/v1/invoke",
+                   json={"message": message}, timeout=30)
+    r.raise_for_status()
+    return r.json()["response"]
+```
+Istio handles mTLS. Add a SPIFFE allow rule in `infrastructure/other-ns/istio/` if
+the target namespace is deny-by-default (`ai`, `auth`, `mcp-servers`).
