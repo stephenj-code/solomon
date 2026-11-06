@@ -29,7 +29,10 @@ pub async fn ready(
             status: "ok",
             database: db_status,
         })),
-        Err(e) => Err((StatusCode::SERVICE_UNAVAILABLE, e)),
+        Err(e) => {
+            tracing::warn!("readiness check failed: {}", e);
+            Err((StatusCode::SERVICE_UNAVAILABLE, e))
+        }
     }
 }
 

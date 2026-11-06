@@ -7,7 +7,7 @@
 ///   INSERT ... ON CONFLICT DO UPDATE (upsert)
 ///   — same input always produces same result, never a duplicate.
 ///
-/// Return Result<T, AppError> — handlers convert AppError to HTTP responses.
+/// Return Result<T, String> — handlers convert errors to HTTP responses.
 use sqlx::PgPool;
 
 pub async fn check_database(pool: &PgPool) -> Result<String, String> {
@@ -15,7 +15,10 @@ pub async fn check_database(pool: &PgPool) -> Result<String, String> {
         .execute(pool)
         .await
         .map(|_| "ok".to_string())
-        .map_err(|e| format!("database unreachable: {e}"))
+        .map_err(|e| {
+            tracing::error!(error = %e, "database health check failed");
+            "database unreachable".to_string()
+        })
 }
 
 // Add domain service functions below:

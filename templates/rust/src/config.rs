@@ -3,9 +3,12 @@
 /// All environment variables read here via envy.
 /// Add a new field + env var name when a new setting is needed.
 /// Fields are public so handlers and services can read them.
+///
+/// Note: Config intentionally does NOT derive Debug — database_url and other
+/// secrets would be exposed in any log line that prints the struct.
 use serde::Deserialize;
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone)]
 pub struct Config {
     #[serde(default = "default_host")]
     pub host: String,
@@ -13,6 +16,7 @@ pub struct Config {
     #[serde(default = "default_port")]
     pub port: u16,
 
+    /// Never log this value — it contains credentials.
     #[serde(default)]
     pub database_url: String,
 

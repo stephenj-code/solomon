@@ -14,7 +14,7 @@
 Every child Application points at a path in `infrastructure/` with `directory.recurse: true`.
 
 **Ingress — two paths into the cluster:**
-- LAN: `dnsmasq` resolves `*.project-solomon.ai` → `192.168.1.49` → IngressGateway `:443` (TLS terminated, `wildcard-tls` cert from cert-manager, Cloudflare DNS-01).
+- LAN: `dnsmasq` resolves `*.project-solomon.ai` → `x.x.x.49` → IngressGateway `:443` (TLS terminated, `wildcard-tls` cert from cert-manager, Cloudflare DNS-01).
 - WAN: Cloudflare DNS → Cloudflare tunnel → `cloudflared` pod → IngressGateway `:80` (plain HTTP; Cloudflare terminates TLS externally).
 
 **HTTPRoute pattern:** every app defines an `HTTPRoute` in its own namespace.
@@ -45,7 +45,7 @@ Every new consumer of these namespaces needs an explicit ALLOW policy naming its
 No sidecars. SPIFFE identity: `cluster.local/ns/<ns>/sa/<sa>` — used in all AuthorizationPolicy rules.
 
 **Service type:** always ClusterIP. No NodePort. No LoadBalancer.
-IngressGateway uses `hostPort: 443` + `externalIPs: [192.168.1.49]` on agx-orin-prod-1.
+IngressGateway uses `hostPort: 443` + `externalIPs: [x.x.x.49]` on agx-orin-prod-1.
 
 **Secrets:** always SealedSecrets (`kubeseal --cert scripts/sealed-secrets.pem`). Never commit raw `Secret` objects. Exception: Frigate RTSP creds in `/data/frigate/.env` (chmod 600) on agx-orin-prod-1 host.
 
@@ -57,9 +57,9 @@ IngressGateway uses `hostPort: 443` + `externalIPs: [192.168.1.49]` on agx-orin-
 
 | Node             | Role                | RAM   | IP            |
 |------------------|---------------------|-------|---------------|
-| agx-orin-prod-1  | control-plane + GPU | 61 GB | 192.168.1.49  |
-| orin-nano-prod-1 | worker              | 7 GB  | 192.168.1.175 |
-| orin-nano-dev-1  | worker              | 7 GB  | 192.168.1.139 |
+| agx-orin-prod-1  | control-plane + GPU | 61 GB | x.x.x.49  |
+| orin-nano-prod-1 | worker              | 7 GB  | x.x.x.175 |
+| orin-nano-dev-1  | worker              | 7 GB  | x.x.x.139 |
 
 GPU workloads pin to agx-orin-prod-1 via `nodeSelector`. Never schedule LLM inference on orin-nano nodes.
 
@@ -95,7 +95,7 @@ Ingress: none. Auth: none.
 ### `istio-system`
 
 ArgoCD: `argocd-apps/istio-*.yaml` (5 Applications, waves 0–4) → Helm charts.
-Objects: GatewayClass `istio`, Gateway `main` (https:443 TLS-terminate, http:80 plaintext, `allowedRoutes.from: All`), `RequestAuthentication` `jwt-keycloak` (targets Gateway `main`, validates Keycloak JWTs, `forwardOriginalToken: true`), IngressGateway Deployment (ClusterIP + `externalIPs:[192.168.1.49]`, `hostPort:443`, pinned agx-orin-prod-1).
+Objects: GatewayClass `istio`, Gateway `main` (https:443 TLS-terminate, http:80 plaintext, `allowedRoutes.from: All`), `RequestAuthentication` `jwt-keycloak` (targets Gateway `main`, validates Keycloak JWTs, `forwardOriginalToken: true`), IngressGateway Deployment (ClusterIP + `externalIPs:[x.x.x.49]`, `hostPort:443`, pinned agx-orin-prod-1).
 Ingress: none (this IS the ingress layer). Auth: n/a.
 
 ---
@@ -275,7 +275,7 @@ MCP bridge: `scripts/mcp-proxy.py` + `.mcp.json` — Solomon invokes via `kubect
 ArgoCD: `argocd-apps/nvr.yaml` → `infrastructure/nvr/` wave:6.
 deny-by-default: **NO**. Frigate itself runs as Docker on agx-orin-prod-1 host (`--network=host`, `--privileged`, port 5000). NOT in Kubernetes.
 
-**ServiceEntry** `frigate` — registers `frigate.external.local → 192.168.1.49:5000` in Istio mesh (MESH_EXTERNAL, STATIC). Allows mesh-enrolled pods to call Frigate with traffic classification.
+**ServiceEntry** `frigate` — registers `frigate.external.local → x.x.x.49:5000` in Istio mesh (MESH_EXTERNAL, STATIC). Allows mesh-enrolled pods to call Frigate with traffic classification.
 **oauth2-proxy-frigate** — SA, Deployment `:4180`, Service `:4180`, `oauth2-proxy-frigate-secrets` SealedSecret (RUNTIME).
 Args: `--upstream=http://frigate.external.local:5000` (full reverse proxy, not static://202), `--client-id=frigate-ui`, `--cookie-name=_oauth2_proxy_frigate`.
 Ingress: `frigate.project-solomon.ai` → HTTPRoute → Service `oauth2-proxy-frigate:4180`.

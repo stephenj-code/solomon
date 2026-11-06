@@ -22,9 +22,9 @@ Solomon reads this file on session start to surface the current phase and open t
 
 - [x] Write Istio ArgoCD Helm apps with sync waves 0-4 (`argocd-apps/istio-*.yaml`) — base, istiod, cni, ztunnel, ingressgateway
 - [x] Write GatewayClass + Gateway (`infrastructure/networking/istio/`) — wildcard listener :443 HTTPS + :80 HTTP for cloudflared
-- [x] IngressGateway — ClusterIP + externalIPs: [192.168.1.49], pinned to agx-orin-prod-1, tolerates control-plane taint
+- [x] IngressGateway — ClusterIP + externalIPs: [x.x.x.49], pinned to agx-orin-prod-1, tolerates control-plane taint
 - [x] Write cloudflared Deployment (`infrastructure/networking/cloudflared/`) — 2 replicas, token from SealedSecret
-- [x] Write dnsmasq config (`scripts/dnsmasq-project-solomon.conf`) — split DNS, *.project-solomon.ai → 192.168.1.49
+- [x] Write dnsmasq config (`scripts/dnsmasq-project-solomon.conf`) — split DNS, *.project-solomon.ai → x.x.x.49
 - [x] Write Cilium NetworkPolicy manifests — API server access, observability scraping, internet egress restrictions
 - [ ] **RUNTIME**: Install dnsmasq on agx-orin-prod-1 and copy config (run during migration execution, Phase 13)
 - [ ] **RUNTIME**: Seal cloudflare-tunnel-token → `infrastructure/networking/cloudflared/tunnel-token-sealed.yaml`
@@ -170,17 +170,17 @@ Solomon reads this file on session start to surface the current phase and open t
 - One client, two benefits — no VPN server needed, no open ports
 - [ ] Zero Trust dashboard → Settings → WARP Client → configure enrollment (email or one-time PIN)
 - [ ] Zero Trust dashboard → Networks → Tunnels → your tunnel → Private Networks:
-      add `192.168.1.49/32` as a private network route
+      add `x.x.x.49/32` as a private network route
 - [ ] Zero Trust dashboard → Settings → WARP Client → Device settings → Split Tunnels:
-      mode = "Include IPs and domains", add `192.168.1.49/32`
+      mode = "Include IPs and domains", add `x.x.x.49/32`
 - [ ] Install Cloudflare One Client on Windows laptop (`winget install Cloudflare.WARP`)
 - [ ] Install Cloudflare One Client on Mac laptop (`brew install --cask cloudflare-warp`)
 - [ ] Enroll both laptops: open WARP client → Login with Cloudflare Access → authenticate
 - [ ] Install kubectl on Windows laptop (`winget install Kubernetes.kubectl`)
 - [ ] Install kubectl on Mac laptop (`brew install kubectl`)
-- [ ] Copy kubeconfig from agx-orin to both laptops (`~/.kube/config`, server: `https://192.168.1.49:6443`)
+- [ ] Copy kubeconfig from agx-orin to both laptops (`~/.kube/config`, server: `https://x.x.x.49:6443`)
 - [ ] Test from outside LAN: WARP on → `kubectl get nodes` → should work
-- [ ] Test from outside LAN: WARP on → `ssh stephen@192.168.1.49` → should work
+- [ ] Test from outside LAN: WARP on → `ssh stephen@x.x.x.49` → should work
 
 ### VS Code Remote SSH
 - [ ] Verify VS Code Remote SSH works from both laptops (uses SSH key auth above)
@@ -188,7 +188,7 @@ Solomon reads this file on session start to surface the current phase and open t
 
 ### Access patterns reference
 - **Pattern 1 (primary):** SSH into agx-orin → run `claude` there. kubectl native, MCP tools live. Best for infra changes.
-- **Pattern 2a (LAN):** WARP optional — kubeconfig `192.168.1.49:6443` works directly.
+- **Pattern 2a (LAN):** WARP optional — kubeconfig `x.x.x.49:6443` works directly.
 - **Pattern 2b (remote):** WARP on → same kubeconfig — traffic routes through Cloudflare tunnel automatically.
 
 ---
