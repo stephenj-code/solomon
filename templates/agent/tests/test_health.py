@@ -1,8 +1,9 @@
 """
 test_health.py — health endpoint test.
 
-The graph is lazy-initialised (get_graph()) so importing app.main does not
-trigger LangGraph or LiteLLM setup.  The health handler has no dependencies.
+main.py lifespan checks DATABASE_URL at startup. When empty (CI / local dev),
+it falls back to MemorySaver so no real Postgres connection is attempted.
+The health handler does not use the graph, so this test is always fast.
 """
 from httpx import AsyncClient, ASGITransport
 

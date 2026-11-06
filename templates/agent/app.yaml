@@ -14,6 +14,6 @@ namespace: __APP_NAME__
 
 needs:
   llm: true          # true → LiteLLM virtual key provisioned; allow policy added to ai ns
-  database: false    # true → CloudNativePG Database CR committed to platform repo
+  database: true     # true → CloudNativePG Database CR committed to platform repo
   ui: false          # true → Keycloak browser client + oauth2-proxy config
   m2m: false         # true → Keycloak service account client (machine-to-machine auth)

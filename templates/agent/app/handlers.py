@@ -3,6 +3,8 @@ handlers.py — logic for HTTP endpoints.
 
 Bridges the FastAPI layer to the LangGraph agent.
 Handlers create a thread ID if none given, invoke the graph, return results.
+
+The compiled graph is injected at startup by main.py lifespan via set_graph().
 """
 import json
 import logging
@@ -14,18 +16,21 @@ from langchain_core.messages import HumanMessage
 
 from app.config import settings
 from app.models import AguiRequest, InvokeRequest, InvokeResponse, HealthResponse, StreamRequest
-from app.agent.graph import build_graph
 
 logger = logging.getLogger(__name__)
 
-# Single compiled graph instance (checkpointer wired in main.py)
 _graph = None
 
 
-def get_graph():
+def set_graph(g) -> None:
+    """Called once at startup (lifespan) to inject the compiled graph."""
     global _graph
+    _graph = g
+
+
+def get_graph():
     if _graph is None:
-        _graph = build_graph()
+        raise RuntimeError("graph not initialised — lifespan did not complete")
     return _graph
 
 
