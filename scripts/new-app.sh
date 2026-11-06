@@ -88,14 +88,10 @@ esac
 gh repo create "stephenj-code/$APP_NAME" \
     --private \
     --description "Solomon $TEMPLATE_TYPE: $APP_NAME" \
-    --clone \
     --gitignore "$GITIGNORE" \
     -p "" 2>/dev/null || true  # ignore if repo already exists
 
-# If --clone succeeded, gh already cloned it; otherwise clone manually
-if [[ ! -d "$APP_DIR" ]]; then
-    git clone "https://github.com/stephenj-code/$APP_NAME.git" "$APP_DIR"
-fi
+git clone "https://github.com/stephenj-code/$APP_NAME.git" "$APP_DIR"
 
 # ── Copy template ─────────────────────────────────────────────────────────────
 echo "→ Copying $TEMPLATE_TYPE template..."
@@ -148,7 +144,11 @@ provision.yaml will run automatically and bootstrap:
   - LiteLLM virtual key (sealed secret)
   - ArgoCD Application in solomon platform repo"
 
-git push origin main
+# Ensure we push on main regardless of the default branch name in git config
+git branch -M main
+git push -u origin main
+# Set main as the default branch on GitHub
+gh repo edit "stephenj-code/$APP_NAME" --default-branch main 2>/dev/null || true
 
 echo ""
 echo "✓ Done. Repo: https://github.com/stephenj-code/$APP_NAME"
