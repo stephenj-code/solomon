@@ -23,8 +23,11 @@ jobs:
       - name: Build image
         # npm install + tsc + vite build happen inside the Dockerfile
         # TypeScript errors fail the build here
+        env:
+          DOCKER_BUILDKIT: "1"
         run: |
           docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from ghcr.io/stephenj-code/__APP_NAME__:latest \
             --tag ghcr.io/stephenj-code/__APP_NAME__:${{ steps.tag.outputs.sha }} \
             .

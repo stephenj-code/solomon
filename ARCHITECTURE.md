@@ -49,7 +49,7 @@ IngressGateway uses `hostPort: 443` + `externalIPs: [192.168.1.49]` on agx-orin-
 
 **Secrets:** always SealedSecrets (`kubeseal --cert scripts/sealed-secrets.pem`). Never commit raw `Secret` objects. Exception: Frigate RTSP creds in `/data/frigate/.env` (chmod 600) on agx-orin-prod-1 host.
 
-**New app:** `scripts/new-app.sh <name> [namespace]` → copies `templates/app-template/`, creates GitHub repo, pushes. `provision.yaml` auto-runs and commits: Cloudflare CNAME, Keycloak client (SealedSecret), LiteLLM virtual key (SealedSecret), ArgoCD Application to `argocd-apps/`, LiteLLM allow policy to `infrastructure/ai/istio/`. Optional: CloudNativePG DB CR (`needs.database: true`), oauth2-proxy manifest + Keycloak browser client (`needs.ui: true`).
+**New app:** `scripts/new-app.sh <name> [agent|api|react|rust] [namespace]` → copies the chosen template, creates GitHub repo, pushes. `provision.yaml` auto-runs and commits: Cloudflare CNAME, Keycloak client (SealedSecret), LiteLLM virtual key (SealedSecret), ArgoCD Application to `argocd-apps/`, LiteLLM allow policy to `infrastructure/ai/istio/`. Optional: CloudNativePG DB CR (`needs.database: true`), oauth2-proxy manifest + Keycloak browser client (`needs.ui: true`). See README.md for the five-concept file model common to all template types.
 
 ---
 

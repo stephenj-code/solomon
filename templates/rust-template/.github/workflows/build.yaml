@@ -30,8 +30,11 @@ jobs:
             sh -c "cargo clippy -- -D warnings && cargo test"
 
       - name: Build image
+        env:
+          DOCKER_BUILDKIT: "1"
         run: |
           docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from ghcr.io/stephenj-code/__APP_NAME__:latest \
             --tag ghcr.io/stephenj-code/__APP_NAME__:${{ steps.tag.outputs.sha }} \
             .

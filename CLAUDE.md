@@ -163,12 +163,30 @@ MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-se
 
 ## New service workflow
 
-Every new service, agent, or app starts from `templates/app-template/` in this repo.
-The template lives here so it stays in sync with cluster design — no separate repo to drift.
+Every new service, agent, or app starts from one of four templates in this repo.
 
 ```bash
-scripts/new-app.sh my-agent
+scripts/new-app.sh <name> [agent|api|react|rust] [namespace]
+
+scripts/new-app.sh frigate-agent            # LangGraph agent (default)
+scripts/new-app.sh results-api api          # FastAPI REST service
+scripts/new-app.sh geometry-ui react        # Vite + React UI
+scripts/new-app.sh compute-core rust        # Axum Rust service
 ```
+
+### Five-concept model — applies to every template type
+
+Every app, regardless of language, maps to the same five concepts:
+
+| Concept | What it is | `api` | `agent` | `react` | `rust` |
+|---------|-----------|-------|---------|---------|--------|
+| **Structure** | How the app is wired | `routes.py` | `graph.py` | `routes.tsx` | `router.rs` |
+| **Logic** | What happens per request/node/page | `handlers.py` | `nodes.py` | `pages/` | `handlers.rs` |
+| **Data** | Shapes flowing through | `models.py` | `state.py` | `types.ts` | `models.rs` |
+| **Capabilities** | External calls and tools | `services.py` | `tools.py` | `api.ts` | `services.rs` |
+| **Config** | Settings and instructions | `config.py` | `prompts.py` | `config.ts` | `config.rs` |
+
+Each template's `CLAUDE.md` has the add-new-X workflow. When adding a feature to any app, read that file first.
 
 This creates the GitHub repo, copies the template, substitutes the app name, and pushes.
 Edit `app.yaml` to describe what the app needs, then commit to `main`. The `provision.yaml` workflow runs automatically on first push and bootstraps all external dependencies.
@@ -209,15 +227,16 @@ The Sealed Secrets controller lives in `infrastructure/foundation/sealed-secrets
 
 ```
 Push to main (app repo)
-  → GitHub Actions: build Docker image on self-hosted ARM64 runner
+  → GitHub Actions (ARC, ARM64, DinD): self-hosted runner on agx-orin-prod-1
+  → [rust only] cargo clippy + cargo test
+  → Docker build (BUILDKIT inline cache; warm build ~15–30 s via 100 GB PVC cache)
   → Trivy image scan (fail on CRITICAL CVEs)
-  → Bandit / Semgrep SAST scan
+  → SAST: Bandit + Semgrep (api/agent) | Semgrep JS (react) | cargo clippy (rust)
   → Push to GHCR:
       ghcr.io/stephenj-code/<service>:<7-char-sha>   ← immutable, used in deployment.yaml
       ghcr.io/stephenj-code/<service>:latest
   → On git tag (release): also push ghcr.io/stephenj-code/<service>:v1.2.3
-  → Patch k8s/deployment.yaml with SHA tag
-  → Commit + push to main
+  → Patch k8s/deployment.yaml with SHA tag → commit + push to main
   → ArgoCD detects change → syncs to cluster
 ```
 
