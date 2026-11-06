@@ -62,6 +62,10 @@ esac
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Resolve the current solomon release tag for pinning reusable workflows.
+# Falls back to "main" if no tags exist yet (pre-launch).
+SOLOMON_VERSION=$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null || echo "main")
+
 # job and cronjob share the same template directory
 case "$TEMPLATE_TYPE" in
     cronjob) TEMPLATE_DIR="$REPO_ROOT/templates/job" ;;
@@ -113,6 +117,7 @@ find "$APP_DIR" -type f \
             -e "s|__NAMESPACE__|$NAMESPACE|g" \
             -e "s|__APP_NAME_UPPER__|$APP_NAME_UPPER|g" \
             -e "s|__APP_TYPE__|$TEMPLATE_TYPE|g" \
+            -e "s|__SOLOMON_VERSION__|$SOLOMON_VERSION|g" \
             "$file"
     done
 

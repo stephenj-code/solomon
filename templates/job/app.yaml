@@ -2,6 +2,7 @@
 # Edit this before running: scripts/new-app.sh <name> [job|cronjob]
 name: __APP_NAME__
 type: __APP_TYPE__
+solomon_version: __SOLOMON_VERSION__
 namespace: __NAMESPACE__
 
 # Jobs have no public URL — subdomain is intentionally blank.

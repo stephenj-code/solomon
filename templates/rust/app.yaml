@@ -2,6 +2,7 @@
 # Edit this before running scripts/new-app.sh to describe what this app needs.
 name: __APP_NAME__
 type: agent          # agent | api | ui
+solomon_version: __SOLOMON_VERSION__
 
 # Subdomain: <subdomain>.project-solomon.ai
 # Defaults to app name. Change if you want a shorter public URL.

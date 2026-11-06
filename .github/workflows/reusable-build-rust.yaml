@@ -1,0 +1,86 @@
+name: reusable-build-rust
+# Called by rust app repos.
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: arc-solomon
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set context
+        id: ctx
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "app=${GITHUB_REPOSITORY##*/}" >> $GITHUB_OUTPUT
+
+      - name: Cargo lint and test
+        # Run via the official Rust image — no need to install cargo on the runner
+        run: |
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            rust:1.82 \
+            sh -c "cargo clippy -- -D warnings && cargo test"
+
+      - name: Build image
+        env:
+          DOCKER_BUILDKIT: "1"
+        run: |
+          docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:latest \
+            --tag ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${{ steps.ctx.outputs.sha }} \
+            .
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${{ steps.ctx.outputs.sha }}
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+
+      - name: Login to GHCR
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${{ steps.ctx.outputs.sha }}
+          docker tag \
+            ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${{ steps.ctx.outputs.sha }} \
+            ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:latest
+          docker push ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:latest
+
+      - name: Push semver tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          docker tag \
+            ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${{ steps.ctx.outputs.sha }} \
+            ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${VERSION}
+          docker push ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${VERSION}
+
+      - name: Patch deployment image tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sed -i \
+            "s|ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:.*|ghcr.io/stephenj-code/${{ steps.ctx.outputs.app }}:${{ steps.ctx.outputs.sha }}|" \
+            k8s/deployment.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/deployment.yaml
+          git diff --staged --quiet || git commit -m "chore: update image to ${{ steps.ctx.outputs.sha }}"
+          git push
