@@ -61,7 +61,13 @@ esac
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="$REPO_ROOT/templates/${TEMPLATE_TYPE}"
+
+# job and cronjob share the same template directory
+case "$TEMPLATE_TYPE" in
+    cronjob) TEMPLATE_DIR="$REPO_ROOT/templates/job" ;;
+    *)       TEMPLATE_DIR="$REPO_ROOT/templates/${TEMPLATE_TYPE}" ;;
+esac
+
 WORK_DIR="$(mktemp -d)"
 APP_DIR="$WORK_DIR/$APP_NAME"
 
@@ -110,8 +116,21 @@ find "$APP_DIR" -type f \
             -e "s|__APP_NAME__|$APP_NAME|g" \
             -e "s|__NAMESPACE__|$NAMESPACE|g" \
             -e "s|__APP_NAME_UPPER__|$APP_NAME_UPPER|g" \
+            -e "s|__APP_TYPE__|$TEMPLATE_TYPE|g" \
             "$file"
     done
+
+# ── Type-specific post-processing ─────────────────────────────────────────────
+case "$TEMPLATE_TYPE" in
+    job)
+        # Remove the cronjob manifest — this is a one-shot job
+        rm -f "$APP_DIR/k8s/cronjob.yaml"
+        ;;
+    cronjob)
+        # Remove the job manifest — this runs on a schedule
+        rm -f "$APP_DIR/k8s/job.yaml"
+        ;;
+esac
 
 # ── Initial commit ────────────────────────────────────────────────────────────
 echo "→ Committing initial scaffold..."

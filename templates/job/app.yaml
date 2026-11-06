@@ -1,7 +1,7 @@
 # Provisioning config — read by provision.yaml on first push.
-# Edit this before running: scripts/new-app.sh <name> job
+# Edit this before running: scripts/new-app.sh <name> [job|cronjob]
 name: __APP_NAME__
-type: job
+type: __APP_TYPE__
 namespace: __NAMESPACE__
 
 # Jobs have no public URL — subdomain is intentionally blank.

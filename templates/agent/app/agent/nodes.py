@@ -21,7 +21,7 @@ from app.config import settings
 model = ChatOpenAI(
     model=settings.litellm_model,
     base_url=settings.litellm_base_url,
-    api_key=settings.litellm_api_key,
+    api_key=settings.litellm_api_key.get_secret_value(),
 ).bind_tools(tools)
 
 

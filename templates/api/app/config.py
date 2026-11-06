@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -6,9 +7,9 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     debug: bool = False
 
-    # Injected by Kubernetes via sealed secret
-    database_url: str = ""
-    litellm_api_key: str = ""
+    # Injected by Kubernetes via sealed secret — SecretStr prevents accidental logging
+    database_url: SecretStr = SecretStr("")
+    litellm_api_key: SecretStr = SecretStr("")
     litellm_base_url: str = "http://litellm.ai.svc.cluster.local:4000"
 
     class Config:

@@ -9,6 +9,8 @@ One async function per endpoint. Handlers:
 
 Handlers contain no business logic — that belongs in services.py.
 """
+import logging
+
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +18,8 @@ from app.config import settings
 from app.database import get_db
 from app.models import HealthResponse, ReadyResponse
 from app import services
+
+logger = logging.getLogger(__name__)
 
 
 async def health() -> HealthResponse:
@@ -26,7 +30,8 @@ async def ready(db: AsyncSession = Depends(get_db)) -> ReadyResponse:
     try:
         db_status = await services.check_database(db)
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        logger.warning("readiness check failed: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return ReadyResponse(status="ok", database=db_status)
 
 

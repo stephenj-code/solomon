@@ -9,18 +9,30 @@ Rules:
   - Raise plain Python exceptions (ValueError, RuntimeError)
   - Use httpx.AsyncClient for HTTP — not requests (sync)
   - Use INSERT ... ON CONFLICT DO UPDATE for all writes (idempotent)
+  - Never log secret values, tokens, or connection strings
 """
+import logging
+
 import httpx
 
 from app.models import Item, Result
 
+logger = logging.getLogger(__name__)
+
 
 async def fetch_external(url: str) -> dict:
     """Example: fetch JSON from an external URL."""
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.get(url)
-        r.raise_for_status()
-        return r.json()
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            return r.json()
+    except httpx.HTTPStatusError as exc:
+        logger.warning("HTTP %s fetching %s", exc.response.status_code, url)
+        raise RuntimeError(f"upstream returned {exc.response.status_code}") from exc
+    except httpx.RequestError as exc:
+        logger.error("request failed for %s: %s", url, exc, exc_info=True)
+        raise RuntimeError("upstream request failed") from exc
 
 
 # --- Replace these stubs with real operations ---

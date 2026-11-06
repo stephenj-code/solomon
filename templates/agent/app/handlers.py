@@ -5,7 +5,9 @@ Bridges the FastAPI layer to the LangGraph agent.
 Handlers create a thread ID if none given, invoke the graph, return results.
 """
 import json
+import logging
 import uuid
+
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
@@ -13,6 +15,8 @@ from langchain_core.messages import HumanMessage
 from app.config import settings
 from app.models import AguiRequest, InvokeRequest, InvokeResponse, HealthResponse, StreamRequest
 from app.agent.graph import build_graph
+
+logger = logging.getLogger(__name__)
 
 # Single compiled graph instance (checkpointer wired in main.py)
 _graph = None
@@ -38,7 +42,8 @@ async def invoke(body: InvokeRequest) -> InvokeResponse:
             config=config,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error("invoke failed thread_id=%s: %s", thread_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="agent error") from exc
 
     last_message = result["messages"][-1]
     return InvokeResponse(thread_id=thread_id, response=last_message.content)

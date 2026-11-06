@@ -15,11 +15,4 @@ RUN useradd -r -u 1000 appuser
 USER 1000
 
 EXPOSE 8000
-# Gunicorn + UvicornWorker: multiple processes for a stateless API.
-# 2 workers is a safe default for Jetson's RAM.
-# Override via GUNICORN_WORKERS in k8s/deployment.yaml if needed.
-CMD ["gunicorn", "app.main:app", \
-     "-k", "uvicorn.workers.UvicornWorker", \
-     "-w", "2", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "120"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
