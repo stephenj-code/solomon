@@ -229,11 +229,13 @@ The Sealed Secrets controller lives in `infrastructure/foundation/sealed-secrets
 
 ```
 Push to main (app repo)
-  → GitHub Actions (ARC, ARM64, DinD): self-hosted runner on agx-orin-prod-1
+  → build.yaml (thin caller) → reusable-build-<type>.yaml@<solomon-version> in this repo
+  → GitHub Actions (ARC, ARM64): self-hosted runner on agx-orin-prod-1
+  → [python] pytest in Docker test stage — fails build if tests fail
   → [rust only] cargo clippy + cargo test
-  → Docker build (BUILDKIT inline cache; warm build ~15–30 s via 100 GB PVC cache)
+  → Docker build --target runtime (BUILDKIT inline cache; warm build ~15–30 s)
   → Trivy image scan (fail on CRITICAL CVEs)
-  → SAST: Bandit + Semgrep (api/agent) | Semgrep JS (react) | cargo clippy (rust)
+  → SAST: Bandit + Semgrep (api/agent/job) | Semgrep JS (react) | cargo clippy (rust)
   → Push to GHCR:
       ghcr.io/stephenj-code/<service>:<7-char-sha>   ← immutable, used in deployment.yaml
       ghcr.io/stephenj-code/<service>:latest
@@ -243,6 +245,33 @@ Push to main (app repo)
 ```
 
 ArgoCD always tracks the SHA tag in `deployment.yaml`. Self-hosted runners: ARC on agx-orin-prod-1, ARM64, ephemeral pods, DinD sidecar, 100 GB Docker layer cache PVC.
+
+### Reusable workflows
+
+All CI/CD logic lives in `solomon/.github/workflows/reusable-*.yaml`. App repos contain only a thin 15-line caller — no workflow logic. When a reusable workflow is updated in this repo, every app picks it up on next run.
+
+| Reusable workflow | Used by |
+|-------------------|---------|
+| `reusable-build-python.yaml` | `api`, `agent` |
+| `reusable-build-job.yaml` | `job`, `cronjob` |
+| `reusable-build-react.yaml` | `react` |
+| `reusable-build-rust.yaml` | `rust` |
+| `reusable-provision.yaml` | `api`, `agent`, `react`, `rust` |
+| `reusable-provision-job.yaml` | `job`, `cronjob` |
+
+### Template version pinning
+
+Each app records which solomon release it was scaffolded from in `app.yaml`:
+```yaml
+solomon_version: v0.1
+```
+
+App callers reference the reusable workflow at that tag:
+```yaml
+uses: stephenj-code/solomon/.github/workflows/reusable-build-python.yaml@v0.1
+```
+
+Upgrading an app to a new solomon release = one-line PR bumping `@v0.1` → `@v0.2` in its `build.yaml` and `provision.yaml`. Solomon can scan all app repos and open these PRs automatically when a new tag is cut.
 
 ---
 

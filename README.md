@@ -118,6 +118,7 @@ usage logging, automatic fallback routing.
 | Component | Purpose |
 |-----------|---------|
 | GitHub Actions (ARC) | Self-hosted ARM64 ephemeral runners on agx-orin-prod-1 |
+| Reusable workflows | All CI/CD logic in `solomon/.github/workflows/reusable-*.yaml` — app repos call them by tag, one edit propagates to all apps |
 | GHCR | Container registry — image tagged by git SHA (immutable) + `latest` |
 | Docker layer cache | 100 GB PVC — cold build 4–6 min → warm 15–30 s |
 | ArgoCD | GitOps — watches `k8s/` in each app repo, syncs SHA tag to cluster |
