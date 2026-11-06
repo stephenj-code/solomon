@@ -124,6 +124,64 @@ usage logging, automatic fallback routing.
 
 ---
 
+## How the layers fit together
+
+Every pod that runs in this cluster passes through four distinct layers. Each has one job and hands off to the next.
+
+```
+You write YAML → ArgoCD applies it → kube-apiserver stores it in etcd
+                                              │
+                              kube-scheduler picks a node
+                                              │
+                              kubelet on that node receives the order
+                                    │                │
+                               containerd          Cilium (CNI)
+                           runs the container    wires the network
+                                    │                │
+                              Linux kernel ←─────────┘
+                          namespaces + cgroups + eBPF
+```
+
+### What each component is responsible for
+
+**Kubernetes** — the orchestrator. Decides *what* runs *where* and keeps it that way. Its world is Pods, Services, Deployments, Namespaces. It knows nothing about mTLS, JWT auth, or HTTP routing — those are added by Istio on top.
+
+**containerd** — the executor. Receives an order from kubelet and actually starts the container. Pulls the image, then calls the Linux kernel: `clone()` to create isolated namespaces (each container gets its own network, process tree, filesystem view), and writes to `/sys/fs/cgroup` to enforce CPU/RAM limits. For GPU pods, the NVIDIA runtime maps the GPU in first.
+
+**Cilium** — the network layer. Called by kubelet (via the CNI interface) every time a pod starts. Creates a virtual ethernet pair for the pod, assigns it an IP, then loads eBPF programs into the Linux kernel that enforce NetworkPolicy — allowing or dropping packets before they ever reach the pod. When a NetworkPolicy YAML changes, Cilium updates the kernel programs live.
+
+**eBPF** — a Linux kernel feature that lets you run custom code *inside* the kernel at specific hooks (packet arrival, syscall, connection open) without modifying the kernel itself. Cilium uses it to intercept every packet at the lowest possible level — faster and more precise than iptables.
+
+**Istio (ambient mode)** — a service mesh that runs invisibly alongside pods. Kubernetes sees it as just another DaemonSet (`ztunnel`). It transparently encrypts all pod-to-pod traffic (mTLS) and enforces JWT auth at the gateway. Kubernetes does not know it exists.
+
+**Linux kernel** — does the actual work for all of the above: creates namespace isolation, enforces cgroup resource limits, and runs eBPF programs for packet filtering.
+
+### Pod startup in one flow
+
+```
+1. YAML committed → ArgoCD applies → stored in etcd
+2. kube-scheduler assigns pod to a node
+3. kubelet sees the assignment, calls containerd
+4. containerd pulls image, calls kernel:
+     clone() → isolated namespaces
+     cgroup  → CPU/RAM limits enforced
+5. kubelet calls Cilium (CNI):
+     Cilium creates veth pair, assigns IP
+     bpf() syscall → eBPF program loaded into kernel
+     NetworkPolicy now enforced at kernel level
+6. Pod is live. Istio ztunnel transparently encrypts its traffic.
+```
+
+### Observability — three different views of traffic
+
+| Tool | Level | Answers |
+|------|-------|---------|
+| Hubble | L3/L4 raw packets (eBPF) | Did NetworkPolicy block that? What IPs are connecting? |
+| Kiali | L7 HTTP via Istio mesh | Are my services healthy? What's the error rate? |
+| Jaeger | L7 distributed traces | Why was this request slow? What path did it take? |
+
+---
+
 ## New app
 
 ```bash
