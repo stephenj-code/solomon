@@ -1,0 +1,273 @@
+name: provision
+
+# Runs once on first push to main. Idempotent — skips if .provisioned sentinel exists.
+# Jobs have no public URL — skips Cloudflare DNS and oauth2-proxy.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  provision:
+    runs-on: arc-solomon
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if already provisioned
+        id: check
+        run: |
+          if [ -f .provisioned ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Read app config
+        if: steps.check.outputs.skip == 'false'
+        id: config
+        run: |
+          pip install --quiet pyyaml
+          python3 - <<'EOF'
+          import yaml, os
+          with open("app.yaml") as f:
+              cfg = yaml.safe_load(f)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"name={cfg['name']}\n")
+              out.write(f"namespace={cfg['namespace']}\n")
+              out.write(f"needs_llm={str(cfg['needs'].get('llm', False)).lower()}\n")
+              out.write(f"needs_database={str(cfg['needs'].get('database', False)).lower()}\n")
+              out.write(f"needs_m2m={str(cfg['needs'].get('m2m', False)).lower()}\n")
+          EOF
+
+      # ── Keycloak M2M client ───────────────────────────────────────────────────
+      - name: Create Keycloak client and seal secret
+        if: steps.check.outputs.skip == 'false'
+        env:
+          KEYCLOAK_URL: https://auth.project-solomon.ai
+          KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          KUBESEAL_PEM: ${{ secrets.KUBESEAL_PEM }}
+          APP_NAME: ${{ steps.config.outputs.name }}
+          NAMESPACE: ${{ steps.config.outputs.namespace }}
+        run: |
+          pip install --quiet requests
+          python3 - <<'EOF'
+          import requests, os, subprocess, json, tempfile
+
+          app     = os.environ["APP_NAME"]
+          ns      = os.environ["NAMESPACE"]
+          kc_url  = os.environ["KEYCLOAK_URL"]
+          kc_pass = os.environ["KEYCLOAK_ADMIN_PASSWORD"]
+
+          r = requests.post(f"{kc_url}/realms/master/protocol/openid-connect/token", data={
+              "grant_type": "password", "client_id": "admin-cli",
+              "username": "admin", "password": kc_pass,
+          })
+          r.raise_for_status()
+          token = r.json()["access_token"]
+          headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+          r = requests.post(f"{kc_url}/admin/realms/solomon/clients", headers=headers, json={
+              "clientId": app, "name": app,
+              "secret": None,
+              "serviceAccountsEnabled": True,
+              "standardFlowEnabled": False,
+              "directAccessGrantsEnabled": False,
+          })
+          r.raise_for_status()
+          client_uuid = r.headers["Location"].rstrip("/").split("/")[-1]
+
+          r = requests.get(f"{kc_url}/admin/realms/solomon/clients/{client_uuid}/client-secret", headers=headers)
+          r.raise_for_status()
+          client_secret = r.json()["value"]
+
+          pem = os.environ["KUBESEAL_PEM"]
+          with tempfile.NamedTemporaryFile("w", suffix=".pem", delete=False) as f:
+              f.write(pem)
+              pem_path = f.name
+
+          raw = subprocess.run([
+              "kubectl", "create", "secret", "generic", "keycloak-client",
+              f"--namespace={ns}",
+              f"--from-literal=KEYCLOAK_CLIENT_ID={app}",
+              f"--from-literal=KEYCLOAK_CLIENT_SECRET={client_secret}",
+              "--dry-run=client", "-o", "yaml"
+          ], capture_output=True, text=True, check=True).stdout
+
+          sealed = subprocess.run([
+              "kubeseal", "--cert", pem_path, "--format", "yaml"
+          ], input=raw, capture_output=True, text=True, check=True).stdout
+
+          with open("k8s/sealed-secrets/keycloak-client.yaml", "w") as f:
+              f.write(sealed)
+          print(f"Sealed keycloak-client for {app} in namespace {ns}")
+          EOF
+
+      # ── LiteLLM virtual key ───────────────────────────────────────────────────
+      - name: Create LiteLLM virtual key and seal secret
+        if: steps.check.outputs.skip == 'false' && steps.config.outputs.needs_llm == 'true'
+        env:
+          LITELLM_URL: http://litellm.ai.svc.cluster.local:4000
+          LITELLM_MASTER_KEY: ${{ secrets.LITELLM_MASTER_KEY }}
+          KUBESEAL_PEM: ${{ secrets.KUBESEAL_PEM }}
+          APP_NAME: ${{ steps.config.outputs.name }}
+          NAMESPACE: ${{ steps.config.outputs.namespace }}
+        run: |
+          python3 - <<'EOF'
+          import requests, os, subprocess, tempfile
+
+          app         = os.environ["APP_NAME"]
+          ns          = os.environ["NAMESPACE"]
+          litellm_url = os.environ["LITELLM_URL"]
+          master_key  = os.environ["LITELLM_MASTER_KEY"]
+
+          r = requests.post(f"{litellm_url}/key/generate",
+              headers={"Authorization": f"Bearer {master_key}", "Content-Type": "application/json"},
+              json={"key_alias": app, "metadata": {"app": app}},
+          )
+          r.raise_for_status()
+          api_key = r.json()["key"]
+
+          pem = os.environ["KUBESEAL_PEM"]
+          with tempfile.NamedTemporaryFile("w", suffix=".pem", delete=False) as f:
+              f.write(pem)
+              pem_path = f.name
+
+          raw = subprocess.run([
+              "kubectl", "create", "secret", "generic", "litellm-api-key",
+              f"--namespace={ns}",
+              f"--from-literal=LITELLM_API_KEY={api_key}",
+              "--dry-run=client", "-o", "yaml"
+          ], capture_output=True, text=True, check=True).stdout
+
+          sealed = subprocess.run([
+              "kubeseal", "--cert", pem_path, "--format", "yaml"
+          ], input=raw, capture_output=True, text=True, check=True).stdout
+
+          with open("k8s/sealed-secrets/litellm-api-key.yaml", "w") as f:
+              f.write(sealed)
+          print(f"Sealed litellm-api-key for {app}")
+          EOF
+
+      # ── ArgoCD Application → platform repo ───────────────────────────────────
+      - name: Commit ArgoCD Application to platform repo
+        if: steps.check.outputs.skip == 'false'
+        env:
+          PLATFORM_REPO_TOKEN: ${{ secrets.PLATFORM_REPO_TOKEN }}
+          APP_NAME: ${{ steps.config.outputs.name }}
+          NAMESPACE: ${{ steps.config.outputs.namespace }}
+        run: |
+          git clone \
+            https://x-access-token:${PLATFORM_REPO_TOKEN}@github.com/stephenj-code/solomon.git \
+            /tmp/solomon
+
+          cat > /tmp/solomon/argocd-apps/${APP_NAME}.yaml <<EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: ${APP_NAME}
+            namespace: argocd
+            finalizers:
+              - resources-finalizer.argocd.io
+          spec:
+            project: default
+            source:
+              repoURL: https://github.com/stephenj-code/${APP_NAME}
+              targetRevision: main
+              path: k8s
+              directory:
+                recurse: true
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: ${NAMESPACE}
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+                - CreateNamespace=true
+                - ServerSideApply=true
+          EOF
+
+          cd /tmp/solomon
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add argocd-apps/${APP_NAME}.yaml
+          git commit -m "feat: add ArgoCD application for ${APP_NAME}"
+          git push
+
+      # ── LiteLLM allow policy → platform repo ─────────────────────────────────
+      - name: Commit LiteLLM allow policy to platform repo
+        if: steps.check.outputs.skip == 'false' && steps.config.outputs.needs_llm == 'true'
+        env:
+          PLATFORM_REPO_TOKEN: ${{ secrets.PLATFORM_REPO_TOKEN }}
+          APP_NAME: ${{ steps.config.outputs.name }}
+          NAMESPACE: ${{ steps.config.outputs.namespace }}
+        run: |
+          cat > /tmp/solomon/infrastructure/ai/istio/allow-${APP_NAME}.yaml <<EOF
+          apiVersion: security.istio.io/v1
+          kind: AuthorizationPolicy
+          metadata:
+            name: allow-${APP_NAME}-to-litellm
+            namespace: ai
+          spec:
+            selector:
+              matchLabels:
+                app: litellm
+            action: ALLOW
+            rules:
+              - from:
+                  - source:
+                      principals:
+                        - cluster.local/ns/${NAMESPACE}/sa/${APP_NAME}
+          EOF
+
+          cd /tmp/solomon
+          git add infrastructure/ai/istio/allow-${APP_NAME}.yaml
+          git commit -m "feat: allow ${APP_NAME} to call LiteLLM"
+          git push
+
+      # ── CloudNativePG database ────────────────────────────────────────────────
+      - name: Commit CloudNativePG Database CR to platform repo
+        if: steps.check.outputs.skip == 'false' && steps.config.outputs.needs_database == 'true'
+        env:
+          APP_NAME: ${{ steps.config.outputs.name }}
+        run: |
+          python3 - <<'EOF'
+          import os, pathlib
+
+          app = os.environ["APP_NAME"]
+          db_dir = pathlib.Path("/tmp/solomon/infrastructure/database/databases")
+          db_dir.mkdir(parents=True, exist_ok=True)
+
+          manifest = f"""\
+          apiVersion: postgresql.cnpg.io/v1
+          kind: Database
+          metadata:
+            name: {app}
+            namespace: database
+          spec:
+            cluster:
+              name: shared
+            name: {app}
+            owner: {app}
+          """
+          (db_dir / f"{app}.yaml").write_text(manifest)
+          EOF
+
+          cd /tmp/solomon
+          git add infrastructure/database/databases/${APP_NAME}.yaml
+          git commit -m "feat: add CloudNativePG database for ${APP_NAME}"
+          git push
+
+      # ── Mark provisioned + commit sealed secrets ──────────────────────────────
+      - name: Commit sealed secrets and mark provisioned
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          touch .provisioned
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/ .provisioned
+          git commit -m "chore: seal secrets and mark provisioned"
+          git push

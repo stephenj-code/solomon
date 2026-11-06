@@ -166,25 +166,27 @@ MCP servers are deployed in `infrastructure/mcp-servers/` and run in the `mcp-se
 Every new service, agent, or app starts from one of four templates in this repo.
 
 ```bash
-scripts/new-app.sh <name> [agent|api|react|rust] [namespace]
+scripts/new-app.sh <name> [agent|api|react|rust|job|cronjob] [namespace]
 
 scripts/new-app.sh frigate-agent            # LangGraph agent (default)
 scripts/new-app.sh results-api api          # FastAPI REST service
 scripts/new-app.sh geometry-ui react        # Vite + React UI
 scripts/new-app.sh compute-core rust        # Axum Rust service
+scripts/new-app.sh migrate-data job         # one-shot async batch job
+scripts/new-app.sh nightly-report cronjob   # scheduled async batch job
 ```
 
 ### Five-concept model — applies to every template type
 
 Every app, regardless of language, maps to the same five concepts:
 
-| Concept | What it is | `api` | `agent` | `react` | `rust` |
-|---------|-----------|-------|---------|---------|--------|
-| **Structure** | How the app is wired | `routes.py` | `graph.py` | `routes.tsx` | `router.rs` |
-| **Logic** | What happens per request/node/page | `handlers.py` | `nodes.py` | `pages/` | `handlers.rs` |
-| **Data** | Shapes flowing through | `models.py` | `state.py` | `types.ts` | `models.rs` |
-| **Capabilities** | External calls and tools | `services.py` | `tools.py` | `api.ts` | `services.rs` |
-| **Config** | Settings and instructions | `config.py` | `prompts.py` | `config.ts` | `config.rs` |
+| Concept | What it is | `api` | `agent` | `react` | `rust` | `job`/`cronjob` |
+|---------|-----------|-------|---------|---------|--------|-----------------|
+| **Structure** | How the app is wired | `routes.py` | `graph.py` | `routes.tsx` | `router.rs` | `app/job.py` |
+| **Logic** | What happens per request/node/step | `handlers.py` | `nodes.py` | `pages/` | `handlers.rs` | `app/steps.py` |
+| **Data** | Shapes flowing through | `models.py` | `state.py` | `types.ts` | `models.rs` | `app/models.py` |
+| **Capabilities** | External calls and tools | `services.py` | `tools.py` | `api.ts` | `services.rs` | `app/services.py` |
+| **Config** | Settings and instructions | `config.py` | `prompts.py` | `config.ts` | `config.rs` | `app/config.py` |
 
 Each template's `CLAUDE.md` has the add-new-X workflow. When adding a feature to any app, read that file first.
 

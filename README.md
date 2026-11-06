@@ -186,13 +186,13 @@ You write YAML → ArgoCD applies it → kube-apiserver stores it in etcd
 
 Every app starts from one of four templates, each built around the same five concepts:
 
-| Concept | What it is | `api` | `agent` | `react` | `rust` |
-|---------|-----------|-------|---------|---------|--------|
-| **Structure** | How the app is wired together — routes/graph | `routes.py` | `graph.py` | `routes.tsx` | `router.rs` |
-| **Logic** | What actually happens per request/node/page | `handlers.py` | `nodes.py` | `pages/` | `handlers.rs` |
-| **Data** | Shapes flowing through the app | `models.py` | `state.py` | `types.ts` | `models.rs` |
-| **Capabilities** | External calls — DB queries, API calls, tools | `services.py` | `tools.py` | `api.ts` | `services.rs` |
-| **Config** | Settings, env vars, behavior instructions | `config.py` | `prompts.py` | `config.ts` | `config.rs` |
+| Concept | What it is | `api` | `agent` | `react` | `rust` | `job`/`cronjob` |
+|---------|-----------|-------|---------|---------|--------|-----------------|
+| **Structure** | How the app is wired | `routes.py` | `graph.py` | `routes.tsx` | `router.rs` | `app/job.py` |
+| **Logic** | What happens per request/node/step | `handlers.py` | `nodes.py` | `pages/` | `handlers.rs` | `app/steps.py` |
+| **Data** | Shapes flowing through | `models.py` | `state.py` | `types.ts` | `models.rs` | `app/models.py` |
+| **Capabilities** | External calls and tools | `services.py` | `tools.py` | `api.ts` | `services.rs` | `app/services.py` |
+| **Config** | Settings and instructions | `config.py` | `prompts.py` | `config.ts` | `config.rs` | `app/config.py` |
 
 Understanding these five concepts means understanding every app type in the cluster.
 Each template's `CLAUDE.md` explains the add-new-X workflow for that language.

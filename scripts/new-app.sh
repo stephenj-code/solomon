@@ -5,10 +5,12 @@
 #   scripts/new-app.sh <app-name> [template] [namespace]
 #
 # Templates:
-#   agent   LangGraph agent (default)
-#   api     FastAPI REST service
-#   react   Vite + React UI
-#   rust    Axum Rust service
+#   agent    LangGraph agent (default)
+#   api      FastAPI REST service
+#   react    Vite + React UI
+#   rust     Axum Rust service
+#   job      Async Python batch job (runs once)
+#   cronjob  Async Python batch job (runs on a schedule)
 #
 # Examples:
 #   scripts/new-app.sh frigate-agent
@@ -16,6 +18,8 @@
 #   scripts/new-app.sh geometry-ui react
 #   scripts/new-app.sh compute-core rust
 #   scripts/new-app.sh grafana-agent agent observability
+#   scripts/new-app.sh nightly-report cronjob
+#   scripts/new-app.sh migrate-data job
 #
 # What this does:
 #   1. Creates a private GitHub repo under stephenj-code/<app-name>
@@ -35,7 +39,7 @@ TEMPLATE_TYPE="${2:-agent}"
 NAMESPACE="${3:-$APP_NAME}"
 
 if [[ -z "$APP_NAME" ]]; then
-    echo "Usage: scripts/new-app.sh <app-name> [agent|api|react|rust] [namespace]" >&2
+    echo "Usage: scripts/new-app.sh <app-name> [agent|api|react|rust|job|cronjob] [namespace]" >&2
     exit 1
 fi
 
@@ -47,9 +51,9 @@ fi
 
 # Validate template type
 case "$TEMPLATE_TYPE" in
-    agent|api|react|rust) ;;
+    agent|api|react|rust|job|cronjob) ;;
     *)
-        echo "Error: template must be one of: agent, api, react, rust" >&2
+        echo "Error: template must be one of: agent, api, react, rust, job, cronjob" >&2
         exit 1
         ;;
 esac
@@ -70,9 +74,9 @@ echo "→ Creating GitHub repo stephenj-code/$APP_NAME..."
 
 # Pick gitignore language for GitHub repo creation
 case "$TEMPLATE_TYPE" in
-    agent|api) GITIGNORE="Python" ;;
-    react)     GITIGNORE="Node" ;;
-    rust)      GITIGNORE="Rust" ;;
+    agent|api|job|cronjob) GITIGNORE="Python" ;;
+    react)                 GITIGNORE="Node" ;;
+    rust)                  GITIGNORE="Rust" ;;
 esac
 
 gh repo create "stephenj-code/$APP_NAME" \

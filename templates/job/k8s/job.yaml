@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: __APP_NAME__
+  namespace: __NAMESPACE__
+spec:
+  backoffLimit: 3              # retry up to 3 times on failure
+  ttlSecondsAfterFinished: 3600  # delete job pod 1h after completion
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: __APP_NAME__
+      containers:
+        - name: __APP_NAME__
+          image: ghcr.io/stephenj-code/__APP_NAME__:latest
+          envFrom:
+            - secretRef:
+                name: keycloak-client
+                optional: true
+            - secretRef:
+                name: litellm-api-key
+                optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
