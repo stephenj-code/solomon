@@ -1,0 +1,17 @@
+# Allows the Istio IngressGateway to reach this app.
+# Required because deny-by-default AuthorizationPolicy is active cluster-wide.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-ingress-to-__APP_NAME__
+  namespace: __APP_NAME__
+spec:
+  selector:
+    matchLabels:
+      app: __APP_NAME__
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway

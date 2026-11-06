@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __APP_NAME__
+  namespace: __APP_NAME__
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: __APP_NAME__
+  template:
+    metadata:
+      labels:
+        app: __APP_NAME__
+    spec:
+      serviceAccountName: __APP_NAME__
+      containers:
+        - name: __APP_NAME__
+          # build.yaml patches this tag on every push to main
+          image: ghcr.io/stephenj-code/__APP_NAME__:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_NAME
+              value: __APP_NAME__
+            # Keycloak — for validating inbound JWTs or calling Keycloak APIs
+            - name: KEYCLOAK_URL
+              value: https://auth.project-solomon.ai
+            - name: KEYCLOAK_REALM
+              value: solomon
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-client
+                  key: KEYCLOAK_CLIENT_ID
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-client
+                  key: KEYCLOAK_CLIENT_SECRET
+            # LiteLLM — virtual key scoped to this app (remove if needs.llm: false)
+            - name: LITELLM_BASE_URL
+              value: http://litellm.ai.svc.cluster.local:4000
+            - name: LITELLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-api-key
+                  key: LITELLM_API_KEY
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
